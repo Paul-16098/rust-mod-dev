@@ -12,8 +12,7 @@ permissions: write-all
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: [ubuntu-latest,windows-latest]
 
     steps:
     - uses: actions/checkout@v4
@@ -32,4 +31,6 @@ jobs:
         automatic_release_tag: "latest"
         prerelease: true
         title: "Development Build"
-        files: ./target/release/mod-dev.exe
+        files: |
+          ./target/release/mod-dev.exe
+          ./target/release/mod-dev
