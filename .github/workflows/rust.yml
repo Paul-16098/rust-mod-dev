@@ -23,8 +23,8 @@ jobs:
     #   run: cargo test --verbose
 
     - name: List build artifacts
-      run: ls -l ./
-      
+      run: ls -l ./target
+
     - name: "Create release"
       uses: marvinpinto/action-automatic-releases@latest
       with:
