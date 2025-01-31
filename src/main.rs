@@ -4,11 +4,9 @@ use glob::glob;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashSet;
-use std::{
-    fs::File,
-    io::{Seek, Write},
-    process::Command,
-};
+use std::fs::File;
+use std::io::{Seek, Write};
+use std::process::Command;
 use walkdir::WalkDir;
 use zip::write::{FileOptions, ZipWriter};
 
@@ -25,7 +23,7 @@ impl BootJson {
     fn new(path: &str) -> BootJson {
         let file_content = std::fs::read(path).expect("Failed to read file");
         let json: BootJson = serde_json::from_slice(&file_content).expect("Failed to parse JSON");
-        return json;
+        json
     }
 }
 
@@ -64,11 +62,7 @@ where
     }
 }
 
-fn main() {
-    // 在debug模式下打印當前工作目錄
-    #[cfg(debug_assertions)]
-    println!("cwd: {:?}", std::env::current_dir().unwrap());
-
+fn compile_typescript_files() {
     println!("===== ts相關處理開始");
 
     // 編譯所有的TypeScript文件
@@ -97,7 +91,9 @@ fn main() {
     }
 
     println!("##### ts相關處理結束");
+}
 
+fn process_boot_json_files() {
     println!("===== boot.json相關處理開始");
 
     // 處理所有的boot.json文件
@@ -198,7 +194,9 @@ fn main() {
         }
     }
     println!("##### 處理boot.json文件結束");
+}
 
+fn compress_mod_folders() {
     println!("===== 壓縮所有的mod文件夾開始");
 
     let results_dir = "./results/";
@@ -238,4 +236,14 @@ fn main() {
         }
     }
     println!("##### 壓縮所有的mod文件夾結束");
+}
+
+fn main() {
+    // 在debug模式下打印當前工作目錄
+    #[cfg(debug_assertions)]
+    println!("cwd: {:?}", std::env::current_dir().unwrap());
+
+    compile_typescript_files();
+    process_boot_json_files();
+    compress_mod_folders();
 }
