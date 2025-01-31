@@ -47,5 +47,5 @@ jobs:
         prerelease: true
         title: "Development Build"
         files: |
-          ./target/release/mod-dev.exe
-          ./target/release/mod-dev
+          ./target/x86_64-pc-windows-gnu/release/mod-dev.exe
+          ./target/x86_64-unknown-linux-gnu/release/mod-dev
