@@ -27,4 +27,4 @@ jobs:
         automatic_release_tag: "latest"
         prerelease: true
         title: "Development Build"
-        files: target\release\mod-dev.exe
+        files: target/release/mod-dev.exe
