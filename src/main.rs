@@ -1,14 +1,19 @@
 use glob::glob;
-#[warn(unused_imports)]
+use log::debug;
+#[allow(unused_imports)]
 use log::{info, trace, warn};
+use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{Seek, Write};
-use std::process::Command;
+use std::path::Path;
 use walkdir::WalkDir;
 use zip::write::{FileOptions, ZipWriter};
 
+rust_i18n::i18n!(fallback = ["en"]);
+
+/// boot.json結構體
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct BootJson {
@@ -20,13 +25,54 @@ pub struct BootJson {
 }
 
 impl BootJson {
-    fn new(path: &str) -> BootJson {
-        let file_content = std::fs::read(path).expect("Failed to read file");
-        let json: BootJson = serde_json::from_slice(&file_content).expect("Failed to parse JSON");
-        json
+    /// 從文件路徑創建BootJson實例
+    fn new(path: &str) -> Result<BootJson, Box<dyn std::error::Error>> {
+        let file_content = std::fs::read(path)?;
+        let mut json: BootJson = serde_json::from_slice(&file_content)?;
+
+        // 初始化所有Option字段
+        json.name = Some(json.name.unwrap_or_else(|| "unknown".to_string()));
+        json.additionFile = Some(json.additionFile.unwrap_or_default());
+        json.imgFileList = Some(json.imgFileList.unwrap_or_default());
+        json.scriptFileList = Some(json.scriptFileList.unwrap_or_default());
+        json.styleFileList = Some(json.styleFileList.unwrap_or_default());
+
+        Ok(json)
+    }
+
+    /// 更新文件列表
+    fn update_file_lists(
+        &mut self,
+        cwd: &std::path::Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let show_cwd = cwd.display();
+
+        // 確保所有列表已初始化
+        let addition_files = self.additionFile.get_or_insert_with(Vec::new);
+        let img_files = self.imgFileList.get_or_insert_with(Vec::new);
+        let script_files = self.scriptFileList.get_or_insert_with(Vec::new);
+        let style_files = self.styleFileList.get_or_insert_with(Vec::new);
+
+        // 處理附加文件
+        for file in ["README.md", "README.txt", "License.txt", "License"].iter() {
+            let file_path = format!("{}/{}", show_cwd, file);
+            if std::path::Path::new(&file_path).exists()
+                && !addition_files.contains(&file.to_string())
+            {
+                addition_files.push(file.to_string());
+            }
+        }
+
+        // 處理各類型文件
+        scan_and_add_files(&format!("{}/**/*.png", show_cwd), img_files, cwd)?;
+        scan_and_add_files(&format!("{}/**/*.js", show_cwd), script_files, cwd)?;
+        scan_and_add_files(&format!("{}/**/*.css", show_cwd), style_files, cwd)?;
+
+        Ok(())
     }
 }
 
+/// 將文件夾添加到zip壓縮包中
 fn add_to_zip<W>(path: &str, zip: &mut ZipWriter<W>)
 where
     W: Write + Seek,
@@ -53,143 +99,68 @@ where
     }
 }
 
-pub fn compile_typescript_files() {
-    info!("===== ts相關處理開始");
-
-    // 編譯所有的TypeScript文件
-    for entry in glob("./mods/*/").expect("Failed to read glob pattern") {
-        match entry {
-            Ok(path) => {
-                // 檢查是否存在TypeScript文件
-                if glob(&format!("{}/**/*.ts", path.display()))
-                    .expect("Failed to read glob pattern")
-                    .count()
-                    > 0
-                {
-                    // 編譯TypeScript文件
-                    let output = Command::new("tsc.cmd")
-                        .arg(format!("-p {}", path.to_str().unwrap()))
-                        .stdout(std::process::Stdio::null())
-                        .status();
-                    match output {
-                        Ok(_) => info!("    {} 編譯完畢", path.to_str().unwrap()),
-                        Err(e) => warn!("{:?}", e),
-                    }
-                }
-            }
-            Err(e) => warn!("{:?}", e),
-        }
-    }
-
-    info!("##### ts相關處理結束");
+/// 用於處理文件路徑的工具函數
+fn process_file_path(path: &std::path::Path, cwd: &std::path::Path) -> Option<String> {
+    path.strip_prefix(cwd).ok()?.to_str().map(|s| s.to_string())
 }
 
-pub fn process_boot_json_files() {
-    info!("===== boot.json相關處理開始");
+/// 掃描並添加特定類型的文件
+fn scan_and_add_files(
+    pattern: &str,
+    file_list: &mut Vec<String>,
+    cwd: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for entry in glob(pattern)? {
+        if let Ok(path) = entry {
+            if let Some(rel_path) = process_file_path(&path, cwd) {
+                if !file_list.contains(&rel_path) {
+                    file_list.push(rel_path);
+                }
+            }
+        }
+    }
+    Ok(())
+}
 
-    // 處理所有的boot.json文件
-    for entry in glob("./mods/*/boot.json").expect("Failed to read glob pattern") {
+/// 處理boot.json文件
+pub fn process_boot_json_files() {
+    info!("{}", t!("boot_json.start"));
+
+    for entry in glob("./tmp/*/boot.json").expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let cwd = path.parent().unwrap();
-                let show_cwd = cwd.display();
-                info!("    處理boot.json文件: {:?}", path.display());
+                info!("{}", t!("boot_json.processing", path = path.display()));
 
-                // 加載boot.json文件
-                let boot_json_file = File::open(path.clone()).expect("Failed to open file");
-                let mut boot_json: BootJson = match serde_json::from_reader(boot_json_file) {
-                    Err(e) => {
-                        warn!("Failed to parse JSON in file {:?}: {:?}", path, e);
-                        continue;
-                    }
-                    Ok(f) => f,
-                };
-
-                let mut boot_json_file = File::create(path.clone()).expect("Failed to open file");
-
-                // 確保boot.json中的字段不為None
-                boot_json
-                    .name
-                    .get_or_insert_with(|| cwd.file_name().unwrap().to_str().unwrap().to_string());
-                boot_json.additionFile.get_or_insert_with(Vec::new);
-                boot_json.imgFileList.get_or_insert_with(Vec::new);
-                boot_json.scriptFileList.get_or_insert_with(Vec::new);
-                boot_json.styleFileList.get_or_insert_with(Vec::new);
-
-                // 添加README和License文件到additionFile
-                for file in ["README.md", "README.txt", "License.txt", "License"].iter() {
-                    if std::path::Path::new(&format!("{show_cwd}/{file}")).exists() {
-                        boot_json
-                            .additionFile
-                            .as_mut()
-                            .unwrap()
-                            .push(file.to_string());
-                    }
-                }
-
-                // 添加所有的img文件到boot.json
-                for entry in
-                    glob(&format!("{show_cwd}/**/*.img",)).expect("Failed to read glob pattern")
-                {
-                    match entry {
-                        Ok(path) => {
-                            boot_json
-                                .imgFileList
-                                .as_mut()
-                                .unwrap()
-                                .push(path.to_str().unwrap().to_string());
+                match BootJson::new(path.to_str().unwrap()) {
+                    Ok(mut boot_json) => {
+                        if let Err(e) = boot_json.update_file_lists(cwd) {
+                            warn!("更新文件列表失敗: {:?}", e);
+                            continue;
                         }
-                        Err(e) => warn!("{:?}", e),
-                    }
-                }
 
-                // 添加所有的js文件到boot.json
-                for entry in
-                    glob(&format!("{show_cwd}/**/*.js")).expect("Failed to read glob pattern")
-                {
-                    match entry {
-                        Ok(path) => {
-                            boot_json
-                                .scriptFileList
-                                .as_mut()
-                                .unwrap()
-                                .push(path.to_str().unwrap().to_string());
+                        // 保存更新後的boot.json
+                        match serde_json::to_string_pretty(&boot_json) {
+                            Ok(json_string) => {
+                                if let Err(e) = std::fs::write(&path, json_string) {
+                                    warn!("寫入boot.json失敗: {:?}", e);
+                                }
+                            }
+                            Err(e) => warn!("序列化JSON失敗: {:?}", e),
                         }
-                        Err(e) => warn!("{:?}", e),
                     }
+                    Err(e) => warn!("讀取boot.json失敗: {:?}", e),
                 }
-
-                // 添加所有的css文件到boot.json
-                for entry in
-                    glob(&format!("{show_cwd}/**/*.css")).expect("Failed to read glob pattern")
-                {
-                    match entry {
-                        Ok(path) => {
-                            boot_json
-                                .styleFileList
-                                .as_mut()
-                                .unwrap()
-                                .push(path.to_str().unwrap().to_string());
-                        }
-                        Err(e) => warn!("{:?}", e),
-                    }
-                }
-
-                // 將更新後的boot.json寫回文件
-                let boot_json_string =
-                    serde_json::to_string(&boot_json).expect("Failed to serialize JSON");
-                boot_json_file
-                    .write_all(boot_json_string.as_bytes())
-                    .expect("Failed to write file");
             }
             Err(e) => warn!("{:?}", e),
         }
     }
-    info!("##### 處理boot.json文件結束");
+    info!("{}", t!("boot_json.end"));
 }
 
+/// 壓縮所有的mod文件夾
 pub fn compress_mod_folders() {
-    info!("===== 壓縮所有的mod文件夾開始");
+    info!("{}", t!("compress.start"));
 
     let results_dir = "./results/";
     if std::path::Path::new(results_dir).exists() {
@@ -197,11 +168,12 @@ pub fn compress_mod_folders() {
     }
     std::fs::create_dir(results_dir).expect("Failed to create results directory");
 
-    for entry in glob("./mods/*/").expect("Failed to read glob pattern") {
+    for entry in glob("./tmp/*/").expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let cwd = path.as_path();
-                let boot_json = BootJson::new(format!("{}/boot.json", cwd.display()).as_str());
+                let boot_json = BootJson::new(format!("{}/boot.json", cwd.display()).as_str())
+                    .expect("Failed to create BootJson");
                 let zip_file = match File::create(&format!(
                     "{results_dir}{}.mod.zip",
                     boot_json.name.unwrap_or_else(|| "unknown".to_string())
@@ -220,23 +192,94 @@ pub fn compress_mod_folders() {
                 add_to_zip(cwd.to_str().unwrap(), &mut zip);
 
                 match zip.finish() {
-                    Ok(_) => info!("    壓縮{}完畢", cwd.display()),
+                    Ok(_) => info!("{}", t!("compress.done", path = cwd.display())),
                     Err(e) => warn!("{:?}", e),
                 }
             }
             Err(e) => warn!("{:?}", e),
         }
     }
-    info!("##### 壓縮所有的mod文件夾結束");
+    info!("{}", t!("compress.end"));
+}
+
+/// 遞迴複製目錄
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if !dst.exists() {
+        fs::create_dir_all(dst)?;
+    }
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+/// copy ./mods/* to ./tmp/*
+pub fn copy_to_tmp() {
+    info!("{}", t!("copy_to_tmp.start"));
+    let mods_dir = Path::new("./mods");
+    let tmp_dir = Path::new("./tmp");
+
+    if tmp_dir.exists() {
+        fs::remove_dir_all(tmp_dir).expect("Failed to remove tmp directory");
+    }
+    fs::create_dir(tmp_dir).expect("Failed to create tmp directory");
+    if !mods_dir.exists() {
+        fs::create_dir(mods_dir).expect("Failed to create mods directory");
+    }
+
+    for entry in fs::read_dir(mods_dir).expect("Failed to read mods directory") {
+        let entry = entry.expect("Failed to read entry");
+        let path = entry.path();
+        if path.is_dir() {
+            let dest = tmp_dir.join(path.file_name().unwrap());
+            if let Err(e) = copy_dir_all(&path, &dest) {
+                warn!("Failed to copy directory {}: {}", path.display(), e);
+            }
+            info!(
+                "{}",
+                t!(
+                    "copy.done",
+                    path = path.display().to_string().replace("/", "\\")
+                )
+            );
+        }
+    }
+    info!("{}", t!("copy_to_tmp.done"));
 }
 
 fn main() {
-    colog::init();
-    // 在debug模式下打印當前工作目錄
-    #[cfg(debug_assertions)]
-    trace!("cwd: {:?}", std::env::current_dir().unwrap());
+    let mut locale = "en";
+    let config_content = match fs::read_to_string("./cofg.txt") {
+        Ok(f) => f,
+        Err(_) => "locale=en".to_string(),
+    };
+    for line in config_content.lines() {
+        let mut l = line.split("=");
+        let key = l.next().unwrap_or("");
+        let value = l.next().unwrap_or("");
+        if key == "locale" {
+            if ["zh", "en"].contains(&value) {
+                locale = value;
+            }
+        }
+    }
 
-    compile_typescript_files();
+    rust_i18n::set_locale(locale);
+    colog::init();
+    debug!("cwd: {:?}", std::env::current_dir().unwrap());
+    debug!("locale: {:?}", rust_i18n::locale().as_ref() as &str);
+
+    copy_to_tmp();
     process_boot_json_files();
     compress_mod_folders();
 }
