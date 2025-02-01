@@ -1,3 +1,4 @@
+// 引入必要的外部crate
 use glob::glob;
 use log::debug;
 #[allow(unused_imports)]
@@ -13,7 +14,8 @@ use zip::write::{FileOptions, ZipWriter};
 
 rust_i18n::i18n!(fallback = ["en"]);
 
-/// boot.json結構體
+/// BootJson結構體: 用於解析和管理boot.json文件
+/// 包含mod的基本信息和相關資源文件列表
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct BootJson {
@@ -26,6 +28,8 @@ pub struct BootJson {
 
 impl BootJson {
     /// 從文件路徑創建BootJson實例
+    /// * `path` - boot.json文件的路徑
+    /// * 返回 Result<BootJson, Box<dyn std::error::Error>>
     fn new(path: &str) -> Result<BootJson, Box<dyn std::error::Error>> {
         let file_content = std::fs::read(path)?;
         let mut json: BootJson = serde_json::from_slice(&file_content)?;
@@ -41,6 +45,10 @@ impl BootJson {
     }
 
     /// 更新文件列表
+    /// * `cwd` - 當前工作目錄路徑
+    /// * 返回 Result
+    ///
+    /// 該函數會掃描工作目錄下的所有相關文件並更新到對應的文件列表中
     fn update_file_lists(
         &mut self,
         cwd: &std::path::Path,
@@ -73,6 +81,8 @@ impl BootJson {
 }
 
 /// 將文件夾添加到zip壓縮包中
+/// * `path` - 要壓縮的文件夾路徑
+/// * `zip` - ZipWriter實例
 fn add_to_zip<W>(path: &str, zip: &mut ZipWriter<W>)
 where
     W: Write + Seek,
@@ -99,12 +109,17 @@ where
     }
 }
 
-/// 用於處理文件路徑的工具函數
+/// 處理文件路徑，將絕對路徑轉換為相對路徑
+/// * `path` - 要處理的文件路徑
+/// * `cwd` - 當前工作目錄
 fn process_file_path(path: &std::path::Path, cwd: &std::path::Path) -> Option<String> {
     path.strip_prefix(cwd).ok()?.to_str().map(|s| s.to_string())
 }
 
-/// 掃描並添加特定類型的文件
+/// 掃描並添加特定類型的文件到文件列表中
+/// * `pattern` - 文件匹配模式
+/// * `file_list` - 文件列表
+/// * `cwd` - 當前工作目錄
 fn scan_and_add_files(
     pattern: &str,
     file_list: &mut Vec<String>,
@@ -122,7 +137,8 @@ fn scan_and_add_files(
     Ok(())
 }
 
-/// 處理boot.json文件
+/// 主要處理boot.json文件的函數
+/// 掃描、解析和更新所有mod文件夾中的boot.json文件
 pub fn process_boot_json_files() {
     info!("{}", t!("boot_json.start"));
 
@@ -158,7 +174,8 @@ pub fn process_boot_json_files() {
     info!("{}", t!("boot_json.end"));
 }
 
-/// 壓縮所有的mod文件夾
+/// 壓縮所有的mod文件夾成zip格式
+/// 將處理完的mod打包成最終發布格式
 pub fn compress_mod_folders() {
     info!("{}", t!("compress.start"));
 
@@ -202,7 +219,9 @@ pub fn compress_mod_folders() {
     info!("{}", t!("compress.end"));
 }
 
-/// 遞迴複製目錄
+/// 遞迴複製目錄及其內容
+/// * `src` - 源目錄路徑
+/// * `dst` - 目標目錄路徑
 fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {
         fs::create_dir_all(dst)?;
@@ -223,7 +242,8 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// copy ./mods/* to ./tmp/*
+/// 將mods目錄下的所有內容複製到臨時目錄
+/// 用於後續處理和打包
 pub fn copy_to_tmp() {
     info!("{}", t!("copy_to_tmp.start"));
     let mods_dir = Path::new("./mods");
@@ -257,6 +277,10 @@ pub fn copy_to_tmp() {
     info!("{}", t!("copy_to_tmp.done"));
 }
 
+/// 主函數
+/// 1. 讀取配置文件設置語言
+/// 2. 初始化日誌系統
+/// 3. 執行mod處理流程
 fn main() {
     let mut locale = "en";
     let config_content = match fs::read_to_string("./cofg.txt") {

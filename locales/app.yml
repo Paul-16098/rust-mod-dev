@@ -1,4 +1,6 @@
 _version: 2
+
+# 複製操作相關的提示信息
 copy_to_tmp:
   start:
     en: ===== Copy all the MOD folders to start
@@ -7,6 +9,7 @@ copy_to_tmp:
     en: "##### Copy all the MOD folder to end"
     zh: "##### 複製所有的mod文件夾結束"
 
+# boot.json處理相關的提示信息
 boot_json:
   start:
     en: ===== Start processing boot.json
@@ -18,6 +21,7 @@ boot_json:
     en: "    Processing boot.json file: %{path}"
     zh: "    處理boot.json文件: %{path}"
 
+# 壓縮相關的提示信息
 compress:
   start:
     en: ===== Start compressing MOD folders
@@ -29,6 +33,7 @@ compress:
     en: "    Finished compressing %{path}"
     zh: "    壓縮 %{path} 完畢"
 
+# 複製操作完成的提示信息
 copy:
   done:
     en: "    Finished copying folder %{path}"
