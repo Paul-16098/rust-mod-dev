@@ -1,9 +1,8 @@
-#![allow(non_snake_case)]
-
 use glob::glob;
+#[warn(unused_imports)]
+use log::{info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Seek, Write};
 use std::process::Command;
@@ -11,7 +10,8 @@ use walkdir::WalkDir;
 use zip::write::{FileOptions, ZipWriter};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct BootJson {
+#[allow(non_snake_case)]
+pub struct BootJson {
     name: Option<String>,
     additionFile: Option<Vec<String>>,
     imgFileList: Option<Vec<String>>,
@@ -31,39 +31,30 @@ fn add_to_zip<W>(path: &str, zip: &mut ZipWriter<W>)
 where
     W: Write + Seek,
 {
-    let options: FileOptions<()> =
-        FileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    let mut added_files = HashSet::new();
+    let options: FileOptions<()> = FileOptions::default();
 
     for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
         let new_path = entry.path();
-        let mut name = new_path
+        let name = new_path
             .strip_prefix(std::path::Path::new(path))
             .unwrap()
             .to_path_buf();
 
         #[cfg(debug_assertions)]
-        println!("add to zip: {}", new_path.display());
+        trace!("add to zip: {}", new_path.display());
 
         if new_path.is_file() {
             let mut f = File::open(new_path).unwrap();
-            while added_files.contains(&name) {
-                name = name.with_extension(format!(
-                    "{}_dup",
-                    name.extension().unwrap_or_default().to_str().unwrap()
-                ));
-            }
             zip.start_file(name.to_str().unwrap(), options).unwrap();
             std::io::copy(&mut f, zip).unwrap();
-            added_files.insert(name);
         } else if name.as_os_str().len() != 0 {
             zip.add_directory(name.to_str().unwrap(), options).unwrap();
         }
     }
 }
 
-fn compile_typescript_files() {
-    println!("===== ts相關處理開始");
+pub fn compile_typescript_files() {
+    info!("===== ts相關處理開始");
 
     // 編譯所有的TypeScript文件
     for entry in glob("./mods/*/").expect("Failed to read glob pattern") {
@@ -81,33 +72,34 @@ fn compile_typescript_files() {
                         .stdout(std::process::Stdio::null())
                         .status();
                     match output {
-                        Ok(_) => println!("    {} 編譯完畢", path.to_str().unwrap()),
-                        Err(e) => println!("{:?}", e),
+                        Ok(_) => info!("    {} 編譯完畢", path.to_str().unwrap()),
+                        Err(e) => warn!("{:?}", e),
                     }
                 }
             }
-            Err(e) => println!("{:?}", e),
+            Err(e) => warn!("{:?}", e),
         }
     }
 
-    println!("##### ts相關處理結束");
+    info!("##### ts相關處理結束");
 }
 
-fn process_boot_json_files() {
-    println!("===== boot.json相關處理開始");
+pub fn process_boot_json_files() {
+    info!("===== boot.json相關處理開始");
 
     // 處理所有的boot.json文件
     for entry in glob("./mods/*/boot.json").expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
                 let cwd = path.parent().unwrap();
-                println!("    處理boot.json文件: {:?}", path.display());
+                let show_cwd = cwd.display();
+                info!("    處理boot.json文件: {:?}", path.display());
 
                 // 加載boot.json文件
                 let boot_json_file = File::open(path.clone()).expect("Failed to open file");
                 let mut boot_json: BootJson = match serde_json::from_reader(boot_json_file) {
                     Err(e) => {
-                        println!("Failed to parse JSON in file {:?}: {:?}", path, e);
+                        warn!("Failed to parse JSON in file {:?}: {:?}", path, e);
                         continue;
                     }
                     Ok(f) => f,
@@ -126,7 +118,7 @@ fn process_boot_json_files() {
 
                 // 添加README和License文件到additionFile
                 for file in ["README.md", "README.txt", "License.txt", "License"].iter() {
-                    if std::path::Path::new(&format!("{}/{file}", cwd.display())).exists() {
+                    if std::path::Path::new(&format!("{show_cwd}/{file}")).exists() {
                         boot_json
                             .additionFile
                             .as_mut()
@@ -136,8 +128,8 @@ fn process_boot_json_files() {
                 }
 
                 // 添加所有的img文件到boot.json
-                for entry in glob(&format!("{}/**/*.img", cwd.display()))
-                    .expect("Failed to read glob pattern")
+                for entry in
+                    glob(&format!("{show_cwd}/**/*.img",)).expect("Failed to read glob pattern")
                 {
                     match entry {
                         Ok(path) => {
@@ -147,13 +139,13 @@ fn process_boot_json_files() {
                                 .unwrap()
                                 .push(path.to_str().unwrap().to_string());
                         }
-                        Err(e) => println!("{:?}", e),
+                        Err(e) => warn!("{:?}", e),
                     }
                 }
 
                 // 添加所有的js文件到boot.json
-                for entry in glob(&format!("{}/**/*.js", cwd.display()))
-                    .expect("Failed to read glob pattern")
+                for entry in
+                    glob(&format!("{show_cwd}/**/*.js")).expect("Failed to read glob pattern")
                 {
                     match entry {
                         Ok(path) => {
@@ -163,13 +155,13 @@ fn process_boot_json_files() {
                                 .unwrap()
                                 .push(path.to_str().unwrap().to_string());
                         }
-                        Err(e) => println!("{:?}", e),
+                        Err(e) => warn!("{:?}", e),
                     }
                 }
 
                 // 添加所有的css文件到boot.json
-                for entry in glob(&format!("{}/**/*.css", cwd.display()))
-                    .expect("Failed to read glob pattern")
+                for entry in
+                    glob(&format!("{show_cwd}/**/*.css")).expect("Failed to read glob pattern")
                 {
                     match entry {
                         Ok(path) => {
@@ -179,7 +171,7 @@ fn process_boot_json_files() {
                                 .unwrap()
                                 .push(path.to_str().unwrap().to_string());
                         }
-                        Err(e) => println!("{:?}", e),
+                        Err(e) => warn!("{:?}", e),
                     }
                 }
 
@@ -190,14 +182,14 @@ fn process_boot_json_files() {
                     .write_all(boot_json_string.as_bytes())
                     .expect("Failed to write file");
             }
-            Err(e) => println!("{:?}", e),
+            Err(e) => warn!("{:?}", e),
         }
     }
-    println!("##### 處理boot.json文件結束");
+    info!("##### 處理boot.json文件結束");
 }
 
-fn compress_mod_folders() {
-    println!("===== 壓縮所有的mod文件夾開始");
+pub fn compress_mod_folders() {
+    info!("===== 壓縮所有的mod文件夾開始");
 
     let results_dir = "./results/";
     if std::path::Path::new(results_dir).exists() {
@@ -216,9 +208,9 @@ fn compress_mod_folders() {
                 )) {
                     Ok(f) => f,
                     Err(e) => {
-                        println!("Failed to create file: {:?}", e);
+                        warn!("Failed to create file: {:?}", e);
                         #[cfg(debug_assertions)]
-                        println!("{}", cwd.display());
+                        trace!("{}", cwd.display());
                         continue;
                     }
                 };
@@ -228,20 +220,21 @@ fn compress_mod_folders() {
                 add_to_zip(cwd.to_str().unwrap(), &mut zip);
 
                 match zip.finish() {
-                    Ok(_) => println!("    壓縮{}完畢", cwd.display()),
-                    Err(e) => println!("{:?}", e),
+                    Ok(_) => info!("    壓縮{}完畢", cwd.display()),
+                    Err(e) => warn!("{:?}", e),
                 }
             }
-            Err(e) => println!("{:?}", e),
+            Err(e) => warn!("{:?}", e),
         }
     }
-    println!("##### 壓縮所有的mod文件夾結束");
+    info!("##### 壓縮所有的mod文件夾結束");
 }
 
 fn main() {
+    colog::init();
     // 在debug模式下打印當前工作目錄
     #[cfg(debug_assertions)]
-    println!("cwd: {:?}", std::env::current_dir().unwrap());
+    trace!("cwd: {:?}", std::env::current_dir().unwrap());
 
     compile_typescript_files();
     process_boot_json_files();
