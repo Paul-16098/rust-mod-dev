@@ -24,6 +24,10 @@ copy_to_tmp:
     en: "##### Copy all the MOD folder to end"
     zh_cn: "##### 复制所有的mod文件夹结束"
     zh_tw: "##### 複製所有的mod資料夾結束"
+  skip:
+    en: "    Skipping folder: %{path}"
+    zh_cn: "    跳过文件夹: %{path}"
+    zh_tw: "    跳過資料夾: %{path}"
 
 # boot.json处理相关的提示信息
 boot_json:
@@ -61,3 +65,56 @@ copy:
     en: "    Finished copying folder %{path}"
     zh_cn: "    复制 %{path} 文件夹完毕"
     zh_tw: "    複製 %{path} 資料夾完成"
+
+# 檔案系統相關錯誤消息
+filesystem:
+  create_dir_failed:
+    en: "Failed to create directory: %{path}"
+    zh_cn: "创建目录失败: %{path}"
+    zh_tw: "建立目錄失敗: %{path}"
+  create_file_failed:
+    en: "Failed to create file: %{e}"
+    zh_cn: "创建文件失败: %{e}"
+    zh_tw: "建立檔案失敗: %{e}"
+  remove_dir_failed:
+    en: "Failed to remove directory: %{path}"
+    zh_cn: "删除目录失败: %{path}"
+    zh_tw: "刪除目錄失敗: %{path}"
+  read_file_failed:
+    en: "Failed to read file: %{path}: %{e}"
+    zh_cn: "读取文件失败: %{path}: %{e}"
+    zh_tw: "讀取檔案失敗: %{path}: %{e}"
+  write_file_failed:
+    en: "Failed to write file: %{path}: %{e}"
+    zh_cn: "写入文件失败: %{path}: %{e}"
+    zh_tw: "寫入檔案失敗: %{path}: %{e}"
+  copy_dir_failed:
+    en: "Failed to copy directory %{path}: %{msg}"
+    zh_cn: "复制目录失败 %{path}: %{msg}"
+    zh_tw: "複製目錄失敗 %{path}: %{msg}"
+  update_failed:
+    en: "Failed to update file list: %{msg}"
+    zh_cn: "更新文件列表失败: %{msg}"
+    zh_tw: "更新檔案列表失敗: %{msg}"
+
+# JSON 處理相關錯誤消息
+json:
+  parse_error:
+    en: "Failed to parse JSON: %{msg}"
+    zh_cn: "JSON解析失败: %{msg}"
+    zh_tw: "JSON解析失敗: %{msg}"
+  serialize_error:
+    en: "Failed to serialize JSON: %{msg}"
+    zh_cn: "JSON序列化失败: %{msg}"
+    zh_tw: "JSON序列化失敗: %{msg}"
+
+# 設定相關消息
+config:
+  invalid_locale:
+    en: "Invalid locale: %{msg} (using default)"
+    zh_cn: "无效的语言设置: %{msg} (使用默认值)"
+    zh_tw: "無效的語言設定: %{msg} (使用預設值)"
+  invalid_log_level:
+    en: "Invalid log level: %{msg} (using default)"
+    zh_cn: "无效的日志级别: %{msg} (使用默认值)"
+    zh_tw: "無效的日誌等級: %{msg} (使用預設值)"
