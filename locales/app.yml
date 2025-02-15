@@ -1,40 +1,63 @@
+# 应用程序的本地化配置文件
+# 支持的语言：英文(en),中文(zh_cn),繁體中文(台灣)(zh_tw)
 _version: 2
 
-# 複製操作相關的提示信息
+# 系统级消息
+system:
+  init:
+    en: "System initialized with locale: %{loc}"
+    zh_cn: "系统初始化完成，当前语言: %{loc}"
+    zh_tw: "系統初始化完成，目前語言: %{loc}"
+
+error:
+  en: "Error occurred: %{msg}"
+  zh_cn: "发生错误: %{msg}"
+  zh_tw: "發生錯誤: %{msg}"
+
+# 复制操作相关的提示信息
 copy_to_tmp:
   start:
     en: ===== Copy all the MOD folders to start
-    zh: ===== 複製所有的mod文件夾開始
+    zh_cn: ===== 复制所有的mod文件夹开始
+    zh_tw: ===== 複製所有的mod資料夾開始
   done:
     en: "##### Copy all the MOD folder to end"
-    zh: "##### 複製所有的mod文件夾結束"
+    zh_cn: "##### 复制所有的mod文件夹结束"
+    zh_tw: "##### 複製所有的mod資料夾結束"
 
-# boot.json處理相關的提示信息
+# boot.json处理相关的提示信息
 boot_json:
   start:
     en: ===== Start processing boot.json
-    zh: ===== boot.json相關處理開始
+    zh_cn: ===== boot.json相关处理开始
+    zh_tw: ===== boot.json相關處理開始
   end:
     en: "##### End processing boot.json"
-    zh: "##### 處理boot.json文件結束"
+    zh_cn: "##### 处理boot.json文件结束"
+    zh_tw: "##### 處理boot.json檔案結束"
   processing:
     en: "    Processing boot.json file: %{path}"
-    zh: "    處理boot.json文件: %{path}"
+    zh_cn: "    处理boot.json文件: %{path}"
+    zh_tw: "    處理boot.json檔案: %{path}"
 
-# 壓縮相關的提示信息
+# 压缩相关的提示信息
 compress:
   start:
     en: ===== Start compressing MOD folders
-    zh: ===== 壓縮所有的mod文件夾開始
+    zh_cn: ===== 压缩所有的mod文件夹开始
+    zh_tw: ===== 壓縮所有的mod資料夾開始
   end:
     en: "##### End compressing MOD folders"
-    zh: "##### 壓縮所有的mod文件夾結束"
+    zh_cn: "##### 压缩所有的mod文件夹结束"
+    zh_tw: "##### 壓縮所有的mod資料夾結束"
   done:
     en: "    Finished compressing %{path}"
-    zh: "    壓縮 %{path} 完畢"
+    zh_cn: "    压缩 %{path} 完毕"
+    zh_tw: "    壓縮 %{path} 完成"
 
-# 複製操作完成的提示信息
+# 复制操作完成的提示信息
 copy:
   done:
     en: "    Finished copying folder %{path}"
-    zh: "    複製 %{path} 文件夾完畢"
+    zh_cn: "    复制 %{path} 文件夹完毕"
+    zh_tw: "    複製 %{path} 資料夾完成"

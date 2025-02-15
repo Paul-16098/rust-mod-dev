@@ -1,13 +1,18 @@
 # MOD 開發工具
 
-一個用於處理和打包 MOD 文件的 Rust 工具。
+一個 MOD 文件處理和打包工具，提供 MOD 開發工作流程支持。
 
-## 功能特點
+## 核心功能
 
-- 自動掃描並處理 MOD 文件夾
-- 更新 boot.json 文件配置
-- 自動打包成發布格式
-- 支持多語言界面 (中文/英文)
+- 自動化文件處理
+
+  - MOD 文件掃描和分類
+  - 配置文件自動更新
+  - 文件打包
+
+- 開發輔助功能
+  - 多語言界面
+  - 詳細日誌記錄
 
 ## 使用方法
 
@@ -22,15 +27,18 @@
 ├── mods/           # 存放原始 MOD 文件夾
 ├── tmp/            # 臨時處理目錄
 ├── results/        # 輸出目錄
-└── cofg.txt        # 配置文件
+└── cofg.json        # 配置文件
 ```
 
-## 配置文件
+## 配置文件 (cofg.json)
 
-在 `cofg.txt` 中可以設置以下選項：
+在 `cofg.json` 中可以設置以下選項：
 
-```plaintext
-locale=zh    # 設置界面語言（zh/en）
+```json
+{
+  "locale": "zh_cn", // 設置界面語言（zh_cn/zh_tw/en）
+  "loglv": "info" // 日誌等級 (warn/info/debug/trace)
+}
 ```
 
 ## 開發環境
@@ -46,7 +54,10 @@ locale=zh    # 設置界面語言（zh/en）
 ## 構建方法
 
 ```bash
+# release
 cargo build --release
+# debug
+cargo build
 ```
 
 ## 使用許可

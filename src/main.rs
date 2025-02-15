@@ -1,8 +1,6 @@
 // 引入必要的外部crate
 use glob::glob;
-use log::debug;
-#[allow(unused_imports)]
-use log::{info, trace, warn};
+use log::{debug, info, trace, warn};
 use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -19,11 +17,14 @@ rust_i18n::i18n!(fallback = ["en"]);
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct BootJson {
-    name: Option<String>,
+    name: String,
+    version: Option<String>,
     additionFile: Option<Vec<String>>,
     imgFileList: Option<Vec<String>>,
     scriptFileList: Option<Vec<String>>,
     styleFileList: Option<Vec<String>>,
+    addonPlugin: Option<Vec<addonPlugin>>,
+    dependenceInfo: Option<Vec<dependenceInfo>>,
 }
 
 impl BootJson {
@@ -35,7 +36,8 @@ impl BootJson {
         let mut json: BootJson = serde_json::from_slice(&file_content)?;
 
         // 初始化所有Option字段
-        json.name = Some(json.name.unwrap_or_else(|| "unknown".to_string()));
+        // json.name = Some(json.name.unwrap_or_else(|| "unknown".to_string()));
+        json.version = Some(json.version.unwrap_or_else(|| "1.0.0".to_string()));
         json.additionFile = Some(json.additionFile.unwrap_or_default());
         json.imgFileList = Some(json.imgFileList.unwrap_or_default());
         json.scriptFileList = Some(json.scriptFileList.unwrap_or_default());
@@ -80,6 +82,44 @@ impl BootJson {
     }
 }
 
+/// 表示修改條目的結構
+/// * `passage` - 要修改的文本段落
+/// * `findString` - 要查找的字符串
+/// * `replace` - 替換的內容
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+pub struct ParamEntry {
+    passage: String,
+    findString: String,
+    replace: String,
+}
+
+/// 表示依賴信息的結構
+/// * `modName` - 依賴的mod名稱
+/// * `version` - 依賴的版本號
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+#[allow(non_camel_case_types)]
+pub struct dependenceInfo {
+    modName: String,
+    version: String,
+}
+
+/// 表示插件附加信息的結構
+/// * `modName` - mod名稱
+/// * `addonName` - 插件名稱
+/// * `modVersion` - mod版本
+/// * `params` - 參數列表
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(non_snake_case)]
+#[allow(non_camel_case_types)]
+pub struct addonPlugin {
+    modName: String,
+    addonName: String,
+    modVersion: String,
+    params: Vec<ParamEntry>,
+}
+
 /// 將文件夾添加到zip壓縮包中
 /// * `path` - 要壓縮的文件夾路徑
 /// * `zip` - ZipWriter實例
@@ -96,7 +136,6 @@ where
             .unwrap()
             .to_path_buf();
 
-        #[cfg(debug_assertions)]
         trace!("add to zip: {}", new_path.display());
 
         if new_path.is_file() {
@@ -129,7 +168,7 @@ fn scan_and_add_files(
         if let Ok(path) = entry {
             if let Some(rel_path) = process_file_path(&path, cwd) {
                 if !file_list.contains(&rel_path) {
-                    file_list.push(rel_path);
+                    file_list.push(format!("./{}", rel_path.replace("\\", "/")));
                 }
             }
         }
@@ -191,18 +230,16 @@ pub fn compress_mod_folders() {
                 let cwd = path.as_path();
                 let boot_json = BootJson::new(format!("{}/boot.json", cwd.display()).as_str())
                     .expect("Failed to create BootJson");
-                let zip_file = match File::create(&format!(
-                    "{results_dir}{}.mod.zip",
-                    boot_json.name.unwrap_or_else(|| "unknown".to_string())
-                )) {
-                    Ok(f) => f,
-                    Err(e) => {
-                        warn!("Failed to create file: {:?}", e);
-                        #[cfg(debug_assertions)]
-                        trace!("{}", cwd.display());
-                        continue;
-                    }
-                };
+                let zip_file =
+                    match File::create(&format!("{results_dir}{}.mod.zip", boot_json.name)) {
+                        Ok(f) => f,
+                        Err(e) => {
+                            warn!("Failed to create file: {:?}", e);
+                            #[cfg(debug_assertions)]
+                            trace!("{}", cwd.display());
+                            continue;
+                        }
+                    };
                 let mut zip = ZipWriter::new(zip_file);
 
                 // 壓縮所有文件
@@ -263,7 +300,13 @@ pub fn copy_to_tmp() {
         if path.is_dir() {
             let dest = tmp_dir.join(path.file_name().unwrap());
             if let Err(e) = copy_dir_all(&path, &dest) {
-                warn!("Failed to copy directory {}: {}", path.display(), e);
+                warn!(
+                    "{}",
+                    t!(
+                        "error",
+                        msg = format!("Failed to copy directory {}: {}", path.display(), e)
+                    )
+                );
             }
             info!(
                 "{}",
@@ -277,31 +320,97 @@ pub fn copy_to_tmp() {
     info!("{}", t!("copy_to_tmp.done"));
 }
 
-/// 主函數
-/// 1. 讀取配置文件設置語言
-/// 2. 初始化日誌系統
-/// 3. 執行mod處理流程
-fn main() {
-    let mut locale = "en";
-    let config_content = match fs::read_to_string("./cofg.txt") {
-        Ok(f) => f,
-        Err(_) => "locale=en".to_string(),
+/// 配置初始化函數
+/// * 讀取並解析cofg.json文件
+/// * 設置程序語言環境
+/// * 初始化日誌系統
+pub fn cofg_init() {
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct Cofg {
+        locale: String,
+        loglv: String,
+    }
+    let d_cofg: Cofg = Cofg {
+        locale: "en".to_string(),
+        loglv: "info".to_string(),
     };
-    for line in config_content.lines() {
-        let mut l = line.split("=");
-        let key = l.next().unwrap_or("");
-        let value = l.next().unwrap_or("");
-        if key == "locale" {
-            if ["zh", "en"].contains(&value) {
-                locale = value;
+    let cofg: Cofg = match std::fs::read("./cofg.json") {
+        Ok(o) => match serde_json::from_slice(&o) {
+            Err(_) => d_cofg,
+            Ok(o) => o,
+        },
+        Err(_) => d_cofg,
+    };
+
+    match cofg.locale.as_str() {
+        "zh_cn" | "zh_tw" | "en" => (),
+        o => println!(
+            "{}",
+            t!(
+                "error",
+                msg = format!("not `\"locale\": \"{o}\"` for cofg.json")
+            )
+        ),
+    }
+    rust_i18n::set_locale(&cofg.locale);
+
+    let mut colog_cofg = colog::default_builder();
+    match cofg.loglv.as_str() {
+        "warn" => {
+            colog_cofg.filter_level(log::LevelFilter::Warn);
+            ()
+        }
+        "info" => {
+            colog_cofg.filter_level(log::LevelFilter::Info);
+            ()
+        }
+        "debug" => {
+            colog_cofg.filter_level(log::LevelFilter::Debug);
+            ()
+        }
+        "trace" => {
+            colog_cofg.filter_level(log::LevelFilter::Trace);
+            ()
+        }
+        o => println!(
+            "{}",
+            t!(
+                "error",
+                msg = format!("not `\"loglv\": \"{o}\"` for cofg.json")
+            )
+        ),
+    }
+    #[cfg(debug_assertions)]
+    colog_cofg.filter_level(log::LevelFilter::Debug);
+    colog_cofg.init();
+
+    match serde_json::to_string_pretty(&cofg) {
+        Ok(json_string) => {
+            if let Err(e) = std::fs::write(&"./cofg.json", json_string) {
+                warn!(
+                    "{}",
+                    t!("error", msg = format!("寫入boot.json失敗: {:?}", e))
+                );
             }
         }
+        Err(e) => {
+            warn!("{}", t!("error", msg = format!("序列化JSON失敗: {:?}", e)));
+        }
     }
+}
 
-    rust_i18n::set_locale(locale);
-    colog::init();
-    debug!("cwd: {:?}", std::env::current_dir().unwrap());
-    debug!("locale: {:?}", rust_i18n::locale().as_ref() as &str);
+/// 主函數入口
+/// 執行順序：
+/// 1. 初始化配置
+/// 2. 複製文件到臨時目錄
+/// 3. 處理boot.json文件
+/// 4. 壓縮打包mod文件
+fn main() {
+    cofg_init();
+    debug!(
+        "{}",
+        t!("system.init", loc = &rust_i18n::locale().to_string())
+    );
 
     copy_to_tmp();
     process_boot_json_files();
