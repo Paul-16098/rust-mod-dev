@@ -5,9 +5,9 @@ _version: 2
 # 系统级消息
 system:
   init:
-    en: "System initialized with locale: %{loc}"
-    zh_cn: "系统初始化完成，当前语言: %{loc}"
-    zh_tw: "系統初始化完成，目前語言: %{loc}"
+    en: "System initialized with locale: %{loc}, %{ver}"
+    zh_cn: "系统初始化完成，当前语言: %{loc}, %{ver}"
+    zh_tw: "系統初始化完成，目前語言: %{loc}, %{ver}"
 
 error:
   en: "Error occurred: %{msg}"
@@ -69,17 +69,17 @@ copy:
 # 檔案系統相關錯誤消息
 filesystem:
   create_dir_failed:
-    en: "Failed to create directory: %{path}"
-    zh_cn: "创建目录失败: %{path}"
-    zh_tw: "建立目錄失敗: %{path}"
+    en: "Failed to create directory: %{path}: %{e}"
+    zh_cn: "创建目录失败: %{path}: %{e}"
+    zh_tw: "建立目錄失敗: %{path}: %{e}"
   create_file_failed:
     en: "Failed to create file: %{e}"
     zh_cn: "创建文件失败: %{e}"
     zh_tw: "建立檔案失敗: %{e}"
   remove_dir_failed:
-    en: "Failed to remove directory: %{path}"
-    zh_cn: "删除目录失败: %{path}"
-    zh_tw: "刪除目錄失敗: %{path}"
+    en: "Failed to remove directory: %{path}: %{e}"
+    zh_cn: "删除目录失败: %{path}: %{e}"
+    zh_tw: "刪除目錄失敗: %{path}: %{e}"
   read_file_failed:
     en: "Failed to read file: %{path}: %{e}"
     zh_cn: "读取文件失败: %{path}: %{e}"
