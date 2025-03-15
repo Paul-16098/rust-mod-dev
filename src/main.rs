@@ -243,7 +243,7 @@ fn check_empty_dirs(path: &std::path::PathBuf) -> bool {
 /// 主要處理 *.ts 文件的函數
 fn process_ts_files(cofg: &Cofg) {
   info!("### {} ###", t!("ts.start"));
-  for entry in glob(&format!("{}/*/", cofg.path.mods_path)).expect(&t!("filesystem.glob_failed")) {
+  for entry in glob(&format!("{}/*/", cofg.path.tmp_path)).expect(&t!("filesystem.glob_failed")) {
     match entry {
       Err(_) => (),
       Ok(path) => {

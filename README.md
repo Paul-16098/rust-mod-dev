@@ -36,14 +36,7 @@
 
 在 `cofg.json` 中可以設置以下選項：
 
-<!-- todo: updata -->
-
-```json
-{
-  "locale": "zh_cn", // 設置界面語言（zh_cn/zh_tw/en）
-  "loglv": "info" // 日誌等級 (warn/info/debug/trace)
-}
-```
+see [./cofg.schema.json](./cofg.schema.json)
 
 ## 進階配置
 
