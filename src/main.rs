@@ -1,214 +1,75 @@
-// 引入必要的外部crate
+pub mod boot_json;
+use boot_json::*;
+
+/// 本模組作為程序的主要入口點。包含以下主要功能：
+/// - 配置管理和初始化
+/// - 文件系統操作
+/// - mod文件處理和壓縮打包
+
 use config::Config;
 use glob::glob;
-use log::{ debug, info, trace, warn };
+use log::{ debug, error, info, trace, warn };
 use rust_i18n::t;
 use serde::{ Deserialize, Serialize };
-use serde_json;
 use std::fs::{ self, remove_dir_all, File };
 use std::io::{ Seek, Write };
-use std::path::{ Path, PathBuf };
+use std::path::Path;
 use walkdir::WalkDir;
 use zip::write::{ FileOptions, ZipWriter };
 
-rust_i18n::i18n!(fallback = ["en"]);
+// 設定i18n
+rust_i18n::i18n!("locales", fallback = "en");
 
-/// BootJson結構體: 用於解析和管理boot.json文件
-/// 包含mod的基本信息和相關資源文件列表
+/// 配置相關結構體和實現
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-pub struct BootJson {
-  name: String,
-  version: Option<String>,
-  additionFile: Option<Vec<String>>,
-  imgFileList: Option<Vec<String>>,
-  scriptFileList: Option<Vec<String>>,
-  tweeFileList: Option<Vec<String>>,
-  styleFileList: Option<Vec<String>>,
-  addonPlugin: Option<Vec<addonPlugin>>,
-  dependenceInfo: Option<Vec<dependenceInfo>>,
-}
-
-/// BootJson結構體的方法實現
-impl BootJson {
-  /// 從文件路徑創建BootJson實例
-  /// * `path` - boot.json文件的路徑
-  /// * 返回 Result<BootJson, Box<dyn std::error::Error>>
-  /// # 示例
-  /// ```rust
-  /// let boot_json = BootJson::new("path/to/boot.json")?;
-  /// ```
-  /// # 錯誤處理
-  /// - 返回錯誤如果文件不存在或格式錯誤
-  fn new(path: &str) -> Result<BootJson, Box<dyn std::error::Error>> {
-    let file_content = std::fs::read(path).map_err(|e| format!("無法讀取boot.json文件: {}", e))?;
-
-    let mut json: BootJson = serde_json
-      ::from_slice(&file_content)
-      .map_err(|e| format!("解析boot.json失敗: {}", e))?;
-
-    // 初始化所有Option字段
-    // json.name = Some(json.name.unwrap_or_else(|| "unknown".to_string()));
-    json.version = Some(json.version.unwrap_or_else(|| "1.0.0".to_string()));
-    json.additionFile = Some(json.additionFile.unwrap_or_default());
-    json.imgFileList = Some(json.imgFileList.unwrap_or_default());
-    json.scriptFileList = Some(json.scriptFileList.unwrap_or_default());
-    json.styleFileList = Some(json.styleFileList.unwrap_or_default());
-    json.tweeFileList = Some(json.tweeFileList.unwrap_or_default());
-
-    Ok(json)
-  }
-
-  /// 更新文件列表
-  /// * `cwd` - 當前工作目錄路徑
-  /// * 返回 Result
-  ///
-  /// 該函數會掃描工作目錄下的所有相關文件並更新到對應的文件列表中
-  fn update_file_lists(&mut self, cwd: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    let show_cwd = cwd.display();
-
-    // 確保所有列表已初始化
-    let addition_files = self.additionFile.get_or_insert_with(Vec::new);
-    let img_files = self.imgFileList.get_or_insert_with(Vec::new);
-    let script_files = self.scriptFileList.get_or_insert_with(Vec::new);
-    let style_files = self.styleFileList.get_or_insert_with(Vec::new);
-    let twee_files = self.tweeFileList.get_or_insert_with(Vec::new);
-    self.addonPlugin.get_or_insert_with(Vec::new);
-    self.dependenceInfo.get_or_insert_with(Vec::new);
-
-    // 處理附加文件
-    for file in ["README.md", "README.txt", "License.txt", "License"].iter() {
-      let file_path = format!("{}/{}", show_cwd, file);
-      if std::path::Path::new(&file_path).exists() && !addition_files.contains(&file.to_string()) {
-        addition_files.push(file.to_string());
-      }
-    }
-
-    // 處理各類型文件
-    scan_and_add_files(&format!("{}/**/*.png", show_cwd), img_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.js", show_cwd), script_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.css", show_cwd), style_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.twee", show_cwd), twee_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.js.map", show_cwd), addition_files, cwd)?;
-
-    Ok(())
-  }
-
-  /// 檢查文件是否在任何列表中
-  /// # 參數
-  /// * `value` - 要檢查的文件路徑
-  /// # 返回
-  /// * `bool` - 文件是否存在於任何列表中
-  fn in_list(&self, value: &str) -> bool {
-    // boot.json 總是包含在內
-    if value == "boot.json" {
-      return true;
-    }
-
-    let normalized_path = value.replace("\\", "/");
-    let lists = [
-      &self.imgFileList,
-      &self.scriptFileList,
-      &self.tweeFileList,
-      &self.styleFileList,
-      &self.additionFile,
-    ];
-
-    trace!("檢查路徑: {}", normalized_path);
-    lists.iter().any(|list| list.as_ref().unwrap().contains(&normalized_path))
-  }
-}
-
-/// 表示修改條目的結構
-/// * `passage` - 要修改的文本段落
-/// * `findString` - 要查找的字符串
-/// * `replace` - 替換的內容
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-pub struct ParamEntry {
-  passage: String,
-  findString: String,
-  replace: String,
-}
-
-/// 表示依賴信息的結構
-/// * `modName` - 依賴的mod名稱
-/// * `version` - 依賴的版本號
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-pub struct dependenceInfo {
-  modName: String,
-  version: String,
-}
-
-/// 表示插件附加信息的結構
-/// * `modName` - mod名稱
-/// * `addonName` - 插件名稱
-/// * `modVersion` - mod版本
-/// * `params` - 參數列表
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-pub struct addonPlugin {
-  modName: String,
-  addonName: String,
-  modVersion: String,
-  params: Vec<ParamEntry>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Cofg {
+struct Cofg {
+  /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
+  /// 日誌級別(warn/info/debug/trace)
   loglv: String,
+  /// 路徑相關配置
   path: PathCofg,
+  /// 最後暫停?
+  pause: bool,
+  /// 處理 ts 文件?
+  ts_process: bool,
 }
+
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PathCofg {
+struct PathCofg {
+  /// 臨時文件存放路徑
   tmp_path: String,
+  /// 輸出結果存放路徑
   results_path: String,
+  /// mod源文件路徑
   mods_path: String,
 }
+
 impl Cofg {
   /// 配置初始化函數
   /// * 讀取並解析cofg.json文件
   /// * 設置程序語言環境
   /// * 初始化日誌系統
-  pub fn new() -> Cofg {
-    let d_cofg: Cofg = Cofg {
-      locale: "en".to_string(),
-      loglv: "info".to_string(),
-      path: PathCofg {
-        tmp_path: "./tmp".to_string(),
-        results_path: "./results".to_string(),
-        mods_path: "./mods".to_string(),
-      },
-    };
-
+  fn new() -> Cofg {
     let settings = Config::builder()
       .add_source(config::File::with_name("./cofg.json"))
-      .set_default("locale", d_cofg.locale.clone())
-      .unwrap()
-      .set_default("loglv", d_cofg.loglv.clone())
-      .unwrap()
-      .set_default("path.tmp_path", d_cofg.path.tmp_path.clone())
-      .unwrap()
-      .set_default("path.results_path", d_cofg.path.results_path.clone())
-      .unwrap()
-      .set_default("path.mods_path", d_cofg.path.mods_path.clone())
-      .unwrap()
       .build()
       .unwrap();
-    let mut cofg = settings.try_deserialize::<Cofg>().unwrap_or(d_cofg);
+    let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
-    match cofg.locale.as_str() {
-      "zh_cn" | "zh_tw" | "en" => (),
-      "zh" | "cn" => {
-        cofg.locale = "zh_cn".to_string();
-        ();
+    // 改進語言環境處理邏輯
+    cofg.locale = (
+      match cofg.locale.to_lowercase().as_str() {
+        "zh_cn" | "zh-cn" | "cn" | "zh" => "zh_cn",
+        "zh_tw" | "zh-tw" | "tw" => "zh_tw",
+        "en" | "en_us" | "en-us" => "en",
+        o => {
+          println!("{}", t!("config.invalid_locale", msg = o));
+          "en"
+        }
       }
-      o => println!("{}", t!("config.invalid_locale", msg = o)),
-    }
+    ).to_string();
+
     match cofg.loglv.as_str() {
       "warn" | "info" | "debug" | "trace" => {}
       o => {
@@ -219,18 +80,18 @@ impl Cofg {
 
     match serde_json::to_string_pretty(&cofg) {
       Ok(json_string) => {
-        if let Err(e) = std::fs::write(&"./cofg.json", json_string) {
-          warn!("{}", t!("filesystem.write_file_failed", path = "boot.json", e = e));
+        if let Err(e) = std::fs::write("./cofg.json", json_string) {
+          warn!("{}", t!("filesystem.write_file_failed", path = "cofg.json", e = e));
         }
       }
       Err(e) => {
-        warn!("{}", t!("json.serialize_error", msg = format!("{}", e)));
+        warn!("{}", t!("json.serialize_error", msg = e.to_string()));
       }
     }
-    return cofg;
+    cofg
   }
 
-  pub fn from_cofg_init(&self) {
+  fn init_paths_and_logger(&self) {
     for path in [&self.path.tmp_path, &self.path.results_path].iter() {
       let path_obj = std::path::Path::new(path);
       if path_obj.exists() {
@@ -247,140 +108,196 @@ impl Cofg {
     match self.loglv.as_str() {
       "warn" => {
         colog_cofg.filter_level(log::LevelFilter::Warn);
-        ();
       }
       "info" => {
         colog_cofg.filter_level(log::LevelFilter::Info);
-        ();
       }
       "debug" => {
         colog_cofg.filter_level(log::LevelFilter::Debug);
-        ();
       }
       "trace" => {
         colog_cofg.filter_level(log::LevelFilter::Trace);
-        ();
       }
       o => println!("{}", t!("config.invalid_log_level", msg = o)),
     }
-    #[cfg(debug_assertions)]
-    colog_cofg.filter_level(log::LevelFilter::Debug);
     colog_cofg.init();
   }
 }
 
-/// 將文件夾添加到zip壓縮包中
-/// * `path` - 要壓縮的文件夾路徑
-/// * `zip` - ZipWriter實例
-fn add_to_zip<W>(path: &str, zip: &mut ZipWriter<W>, boot_json: BootJson) where W: Write + Seek {
-  let options: FileOptions<()> = FileOptions::default();
+impl Default for Cofg {
+  fn default() -> Self {
+    Cofg {
+      locale: "en".to_string(),
+      loglv: "info".to_string(),
+      path: PathCofg {
+        tmp_path: "./tmp".to_string(),
+        results_path: "./results".to_string(),
+        mods_path: "./mods".to_string(),
+      },
+      pause: true,
+      ts_process: true,
+    }
+  }
+}
+impl std::fmt::Display for PathCofg {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "    mod: {}\n    tmp: {}\n    results: {}",
+      self.mods_path,
+      self.tmp_path,
+      self.results_path
+    )
+  }
+}
+impl std::fmt::Display for Cofg {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "locale: {},\nloglv: {},\npause: {},\npath: \n{}",
+      self.locale,
+      self.loglv,
+      self.pause,
+      self.path
+    )
+  }
+}
 
-  for entry in WalkDir::new(path)
-    .into_iter()
-    .filter_map(|e| e.ok()) {
-    let new_path = entry.path();
-    let name = new_path.strip_prefix(std::path::Path::new(path)).unwrap().to_path_buf();
+/// 將目錄添加到zip壓縮包中。
+/// 只會添加boot.json文件列表中包含的文件。
+fn add_to_zip<W>(path: &Path, zip: &mut ZipWriter<W>, boot_json: BootJson, options: FileOptions<()>)
+  where W: Write + Seek
+{
+  let base_path = Path::new(path).canonicalize().unwrap();
+  let walkdir = WalkDir::new(path).follow_links(true).sort_by_file_name();
 
-    trace!("add to zip: {}", new_path.display());
+  for entry in walkdir.into_iter().filter_map(|e| e.ok()) {
+    let path = entry.path().canonicalize().unwrap();
+    trace!("{}   {}", path.display(), base_path.display());
+    let relative_path = path.strip_prefix(&base_path).unwrap();
 
-    if new_path.is_file() {
-      if !boot_json.in_list(&process_file_path(new_path, Path::new(path)).unwrap()) {
-        continue;
+    // 跳過根目錄
+    if relative_path.as_os_str().is_empty() {
+      continue;
+    }
+
+    if path.is_file() {
+      // 檢查文件是否在boot.json列表中
+      if let Some(file_path) = relative_path.to_str().map(String::from) {
+        if !boot_json.in_list(&file_path) {
+          trace!("跳過未列出的文件: {}", file_path);
+          continue;
+        }
+
+        if let Err(e) = zip.start_file(file_path.clone(), options) {
+          warn!("無法在zip中創建文件 {}: {}", file_path, e);
+          continue;
+        }
+
+        if let Ok(mut file) = File::open(path) {
+          if let Err(e) = std::io::copy(&mut file, zip) {
+            warn!("無法複製文件內容 {}: {}", file_path, e);
+          }
+        }
       }
-      let mut f = File::open(new_path).unwrap();
-      zip.start_file(name.to_str().unwrap(), options).unwrap();
-      std::io::copy(&mut f, zip).unwrap();
-    } else if name.as_os_str().len() != 0 {
-      if check_empty_dirs(&PathBuf::from(name.clone())) {
-        continue;
+    } else if path.is_dir() && !check_empty_dirs(&path.to_path_buf()) {
+      let dir_path = format!("{}/", relative_path.to_string_lossy());
+      if let Err(e) = zip.add_directory(dir_path, options) {
+        warn!("無法添加目錄 {}: {}", relative_path.display(), e);
       }
-      zip.add_directory(name.to_str().unwrap(), options).unwrap();
     }
   }
 }
 
-#[allow(unreachable_code)]
-#[allow(unused_variables)]
+/// 檢查目錄是否為空
+///
+/// # 參數
+/// * `path` - 要檢查的目錄路徑
+///
+/// # 返回值
+/// * `bool` - true表示目錄為空，false表示非空
 fn check_empty_dirs(path: &std::path::PathBuf) -> bool {
-  return false;
-  if path.is_dir() | path.is_symlink() {
-    match fs::read_dir(path) {
-      Ok(entries) => {
-        // 遍歷目錄中的每個條目
-        for entry in entries {
-          if let Ok(entry) = entry {
-            let entry_path = entry.path();
+  if !path.is_dir() {
+    return false;
+  }
 
-            // 如果是目錄，則遞迴檢查
-            if entry_path.is_dir() {
-              if !check_empty_dirs(&entry_path) {
-                debug!("子目錄{}不空", path.display());
-                return false; // 如果有任何子目錄不空，返回 false
+  match fs::read_dir(path) {
+    Ok(entries) => {
+      let has_valid_entries = entries.flatten().any(|entry| {
+        let entry_path = entry.path();
+        if entry_path.is_dir() {
+          !check_empty_dirs(&entry_path)
+        } else {
+          true
+        }
+      });
+      !has_valid_entries
+    }
+    Err(e) => {
+      error!("{}", t!("filesystem.read_dir_failed", path = path.display(), e = e));
+      false
+    }
+  }
+}
+
+/// 主要處理 *.ts 文件的函數
+fn process_ts_files(cofg: &Cofg) {
+  info!("### {} ###", t!("ts.start"));
+  for entry in glob(&format!("{}/*/", cofg.path.mods_path)).expect(&t!("filesystem.glob_failed")) {
+    match entry {
+      Err(_) => (),
+      Ok(path) => {
+        let mut has_ts_file = false;
+        for entry in glob(&format!("{}/**/*.ts", path.display())).expect(
+          &t!("filesystem.glob_failed")
+        ) {
+          match entry {
+            Err(_) => (),
+            Ok(ts_path) => {
+              if ts_path.ends_with(".d.ts") {
+                continue;
               }
+              has_ts_file = true;
             }
           }
         }
-        debug!("目錄{}空", path.display());
-        // 如果所有條目都檢查完且沒有返回 false，則表示目錄是空的
-        return true;
-      }
-      Err(e) => {
-        eprintln!("無法讀取目錄: {}", e);
-        return false; // 返回 false 表示檢查失敗
-      }
-    }
-  } else {
-    debug!("{}不是目錄", path.display());
-    // 如果不是目錄，返回 false
-    false
-  }
-}
-/// 處理文件路徑，將絕對路徑轉換為相對路徑
-/// * `path` - 要處理的文件路徑
-/// * `cwd` - 當前工作目錄
-fn process_file_path(path: &std::path::Path, cwd: &std::path::Path) -> Option<String> {
-  path
-    .strip_prefix(cwd)
-    .ok()?
-    .to_str()
-    .map(|s| s.to_string())
-}
+        if has_ts_file {
+          // 調用 tsc 編譯 TypeScript 文件
+          let mut tsc_command = if cfg!(windows) {
+            std::process::Command::new("tsc.cmd")
+          } else {
+            std::process::Command::new("tsc")
+          };
+          let output = tsc_command
+            .arg("--project")
+            .arg(path.to_str().unwrap())
+            .output()
+            .expect(&t!("ts.tsc_failed"));
 
-/// 掃描並添加特定類型的文件到文件列表中
-/// * `pattern` - 文件匹配模式
-/// * `file_list` - 文件列表
-/// * `cwd` - 當前工作目錄
-fn scan_and_add_files(
-  pattern: &str,
-  file_list: &mut Vec<String>,
-  cwd: &std::path::Path
-) -> Result<(), Box<dyn std::error::Error>> {
-  for entry in glob(pattern)? {
-    if let Ok(path) = entry {
-      if let Some(rel_path) = process_file_path(&path, cwd) {
-        if !file_list.contains(&rel_path) {
-          file_list.push(rel_path.replace("\\", "/"));
+          if !output.status.success() {
+            error!("    {}", t!("ts.tsc_error", msg = String::from_utf8_lossy(&output.stderr)));
+          } else {
+            info!("    {}", t!("ts.tsc_success", path = path.display()));
+          }
         }
       }
     }
   }
-  Ok(())
+  info!("=== {} ===", t!("ts.end"));
 }
 
-pub fn process_ts_files() {}
-
-/// 主要處理boot.json文件的函數
+/// 主要處理 boot.json 文件的函數
 /// 掃描、解析和更新所有mod文件夾中的boot.json文件
-pub fn process_boot_json_files(cofg: &Cofg) {
-  info!("{}", t!("boot_json.start"));
+fn process_boot_json_files(cofg: &Cofg) {
+  info!("### {} ###", t!("boot_json.start"));
 
   for entry in glob(&format!("{}/*/boot.json", cofg.path.tmp_path)).expect(
-    "Failed to read glob pattern"
+    &t!("filesystem.glob_failed")
   ) {
     match entry {
       Ok(path) => {
         let cwd = path.parent().unwrap();
-        info!("{}", t!("boot_json.processing", path = path.display()));
+        info!("    {}", t!("boot_json.processing", path = path.display()));
 
         match BootJson::new(path.to_str().unwrap()) {
           Ok(mut boot_json) => {
@@ -404,63 +321,74 @@ pub fn process_boot_json_files(cofg: &Cofg) {
           Err(e) => warn!("{}", t!("filesystem.read_file_failed", path = path.display(), e = e)),
         }
       }
-      Err(e) => warn!("{:?}", e),
+      Err(e) => warn!("{}", t!("boot_json.read_error", e = format!("{:?}", e))),
     }
   }
-  info!("{}", t!("boot_json.end"));
+  info!("=== {} ===", t!("boot_json.end"));
 }
 
 /// 壓縮所有的mod文件夾成zip格式
 /// 將處理完的mod打包成最終發布格式
-pub fn compress_mod_folders(cofg: &Cofg) {
-  info!("{}", t!("compress.start"));
+fn compress_mod_folders(cofg: &Cofg) {
+  info!("### {} ###", t!("compress.start"));
 
-  let results_dir = cofg.path.results_path.as_str();
-  if std::path::Path::new(results_dir).exists() {
-    std::fs::remove_dir_all(results_dir).expect("Failed to remove directory");
-  }
-  std::fs::create_dir(results_dir).expect("Failed to create results directory");
+  let results_dir = Path::new(&cofg.path.results_path);
 
-  for entry in glob(&format!("{}/*/", cofg.path.tmp_path)).expect("Failed to read glob pattern") {
-    match entry {
-      Ok(path) => {
-        let cwd = path.as_path();
-        let boot_json = BootJson::new(format!("{}/boot.json", cwd.display()).as_str()).expect(
-          "Failed to create BootJson"
-        );
-        let zip_file = match File::create(&format!("{results_dir}{}.mod.zip", boot_json.name)) {
-          Ok(f) => f,
-          Err(e) => {
-            warn!("{}", t!("filesystem.create_file_failed", e = e));
-            trace!("{}", cwd.display());
-            continue;
-          }
-        };
-        let mut zip = ZipWriter::new(zip_file);
+  for entry in glob(&format!("{}/*/", cofg.path.tmp_path))
+    .expect("Failed to read glob pattern")
+    .flatten() {
+    let src_dir = entry.as_path();
+    let boot_json_path = src_dir.join("boot.json");
 
-        // 壓縮所有文件
-        add_to_zip(cwd.to_str().unwrap(), &mut zip, boot_json);
-
-        match zip.finish() {
-          Ok(_) => info!("{}", t!("compress.done", path = cwd.display())),
-          Err(e) => warn!("{:?}", e),
+    match BootJson::new(boot_json_path.to_str().unwrap()) {
+      Ok(boot_json) => {
+        let zip_path = results_dir.join(format!("{}.mod.zip", boot_json.name));
+        match create_mod_zip(src_dir, &zip_path, boot_json) {
+          Ok(_) => info!("    {}", t!("compress.done", path = src_dir.display())),
+          Err(e) =>
+            warn!("{}", t!("filesystem.compression_failed", path = src_dir.display(), e = e)),
         }
       }
-      Err(e) => warn!("{:?}", e),
+      Err(e) => warn!("{}", t!("boot_json.read_error", e = e)),
     }
   }
-  info!("{}", t!("compress.end"));
+
+  info!("=== {} ===", t!("compress.end"));
+}
+
+/// 壓縮指定目錄到zip文件
+///
+/// # 參數
+/// * `src_dir` - 源目錄
+/// * `zip_path` - 目標zip文件路徑
+/// * `boot_json` - boot.json配置
+fn create_mod_zip(src_dir: &Path, zip_path: &Path, boot_json: BootJson) -> std::io::Result<()> {
+  if true {
+    let file = File::create(zip_path)?;
+    let mut zip = ZipWriter::new(file);
+    let options = FileOptions::default()
+      .compression_method(zip::CompressionMethod::Deflated)
+      .unix_permissions(0o755)
+      .compression_level(None);
+
+    add_to_zip(src_dir, &mut zip, boot_json, options);
+
+    zip.finish()?;
+    Ok(())
+  } else {
+    Ok(())
+  }
 }
 
 /// 文件系統操作相關的輔助函數
 mod fs_utils {
-  use super::*;
+  use super::{ fs, Path };
 
   /// 遞迴複製目錄
   /// # 參數
   /// * `src` - 源目錄路徑
   /// * `dst` - 目標目錄路徑
-  pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+  pub(super) fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {
       fs::create_dir_all(dst)?;
     }
@@ -485,53 +413,63 @@ mod fs_utils {
 
 /// 將mods目錄下的所有內容複製到臨時目錄
 /// 用於後續處理和打包
-pub fn copy_to_tmp(cofg: &Cofg) {
+fn copy_to_tmp(cofg: &Cofg) {
   let mods_dir = Path::new(cofg.path.mods_path.as_str());
   let tmp_dir = Path::new(cofg.path.tmp_path.as_str());
 
-  info!("{}", t!("copy_to_tmp.start"));
+  info!("### {} ###", t!("copy_to_tmp.start"));
 
   for entry in fs::read_dir(mods_dir).expect("Failed to read mods directory") {
     let entry = entry.expect("Failed to read entry");
     let path = entry.path();
     if Path::new(&format!("{}/.ig", path.display())).exists() {
-      info!("{}", t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\")));
+      info!("    {}", t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\")));
       continue;
     }
     if path.is_dir() {
       let dest = tmp_dir.join(path.file_name().unwrap());
       if let Err(e) = fs_utils::copy_dir_all(&path, &dest) {
         warn!(
-          "{}",
+          "    {}",
           t!("filesystem.copy_dir_failed", path = path.display(), msg = format!("{}", e))
         );
       }
-      info!("{}", t!("copy.done", path = path.display().to_string().replace("/", "\\")));
+      info!("    {}", t!("copy.done", path = path.display().to_string().replace("/", "\\")));
     }
   }
-  info!("{}", t!("copy_to_tmp.done"));
+  info!("=== {} ===", t!("copy_to_tmp.done"));
 }
 
-/// 主函數入口
-/// 執行順序：
-/// 1. 初始化配置
-/// 2. 複製文件到臨時目錄
-/// 3. 處理boot.json文件
-/// 4. 壓縮打包mod文件
+/// 主要的處理流程:
+/// 1. 初始化配置(讀取cofg.json)
+/// 2. 設置語言環境和日誌級別
+/// 3. 將mod目錄內容復制到臨時目錄
+/// 4. 處理boot.json文件
+/// 5. 打包所有mod為zip文件
 fn main() {
   // 初始化配置
   let cofg = Cofg::new();
-  cofg.from_cofg_init();
-  let build_type = if cfg!(debug_assertions) { "debug" } else { "release" };
-  let ver = format!("{build_type}{}", "-0.1.0");
-  debug!("{}", t!("system.init", loc = &rust_i18n::locale().to_string(), ver = ver));
+  cofg.init_paths_and_logger();
+  debug!("{}", cofg);
+  if cfg!(debug_assertions) {
+    trace!("trace");
+    debug!("debug");
+    info!("info");
+    warn!("warn");
+    error!("erroe");
+  }
 
   // 複製文件到臨時目錄
   copy_to_tmp(&cofg);
-  process_ts_files();
+  if cofg.ts_process {
+    // 處理*.ts文件
+    process_ts_files(&cofg);
+  }
   // 處理boot.json文件
   process_boot_json_files(&cofg);
   // 壓縮打包mod文件
   compress_mod_folders(&cofg);
-  std::io::stdin().read_line(&mut String::new()).unwrap();
+  if cofg.pause {
+    std::io::stdin().read_line(&mut String::new()).unwrap();
+  }
 }

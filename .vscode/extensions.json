@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "streetsidesoftware.code-spell-checker",
+    "pflannery.vscode-versionlens",
+    "rust-lang.rust-analyzer",
+    "polymeilex.rust-targets"
+  ]
+}

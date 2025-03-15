@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "locale": {
+      "type": "string",
+      "enum": [
+        "zh_tw",
+        "zh-tw",
+        "tw",
+        "en_us",
+        "en-us",
+        "en",
+        "zh_cn",
+        "zh-cn",
+        "zh",
+        "cn"
+      ],
+      "$comment": "程序使用的語言環境"
+    },
+    "loglv": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "trace"],
+      "$comment": "日誌級別"
+    },
+    "path": {
+      "type": "object",
+      "$comment": "路徑相關配置",
+      "properties": {
+        "tmp_path": {
+          "type": "string",
+          "$comment": "臨時文件存放路徑"
+        },
+        "results_path": {
+          "type": "string",
+          "$comment": "輸出結果存放路徑"
+        },
+        "mods_path": {
+          "type": "string",
+          "$comment": "mod源文件路徑"
+        }
+      },
+      "required": ["tmp_path", "results_path", "mods_path"]
+    },
+    "pause": {
+      "type": "boolean",
+      "$comment": "最後暫停?"
+    },
+    "ts_process": {
+      "type": "boolean",
+      "$comment": "處理 ts 文件?"
+    }
+  },
+  "required": ["locale", "loglv", "path", "pause", "ts_process"]
+}
