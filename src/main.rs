@@ -426,11 +426,22 @@ fn copy_to_tmp(cofg: &Cofg) {
   for entry in fs::read_dir(mods_dir).expect("Failed to read mods directory") {
     let entry = entry.expect("Failed to read entry");
     let path = entry.path();
-    if Path::new(&format!("{}/.ig", path.display())).exists() {
-      info!("    {}", t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\")));
-      continue;
-    }
+
     if path.is_dir() {
+      if Path::new(&format!("{}/.ig", path.display())).exists() {
+        info!(
+          "    {}",
+          t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\"))
+        );
+        continue;
+      }
+      if !Path::new(&format!("{}/boot.json", path.display())).exists() {
+        info!(
+          "    {}",
+          t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\"))
+        );
+        continue;
+      }
       let dest = tmp_dir.join(path.file_name().unwrap());
       if let Err(e) = fs_utils::copy_dir_all(&path, &dest) {
         warn!(

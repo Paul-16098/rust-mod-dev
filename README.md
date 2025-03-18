@@ -29,7 +29,7 @@
 ├── mods/           # 存放原始 MOD 文件夾
 ├── tmp/            # 臨時處理目錄
 ├── results/        # 輸出目錄
-└── cofg.json        # 配置文件
+└── cofg.json       # 配置文件
 ```
 
 ## 配置文件 (cofg.json)
