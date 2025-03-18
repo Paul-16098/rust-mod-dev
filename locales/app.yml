@@ -1,40 +1,171 @@
+# 应用程序的本地化配置文件
+# 支持的语言：英文(en),中文(zh_cn),繁體中文(台灣)(zh_tw)
 _version: 2
 
-# 複製操作相關的提示信息
+# 系统级消息
+system:
+  init:
+    en: "System initialized with locale: %{loc}, %{ver}"
+    zh_cn: "系统初始化完成, 当前语言: %{loc}, %{ver}"
+    zh_tw: "系統初始化完成, 目前語言: %{loc}, %{ver}"
+
+error:
+  en: "Error occurred: %{msg}"
+  zh_cn: "发生错误: %{msg}"
+  zh_tw: "發生錯誤: %{msg}"
+
+# 复制操作相关的提示信息
 copy_to_tmp:
   start:
-    en: ===== Copy all the MOD folders to start
-    zh: ===== 複製所有的mod文件夾開始
+    en: "Copy MOD folders start"
+    zh_cn: "复制mod文件夹开始"
+    zh_tw: "複製mod資料夾開始"
   done:
-    en: "##### Copy all the MOD folder to end"
-    zh: "##### 複製所有的mod文件夾結束"
+    en: "Copy MOD folders complete"
+    zh_cn: "复制mod文件夹完成"
+    zh_tw: "複製mod資料夾完成"
+  skip:
+    en: "Skipping folder: %{path}"
+    zh_cn: "跳过文件夾: %{path}"
+    zh_tw: "跳過資料夾: %{path}"
 
-# boot.json處理相關的提示信息
+# boot.json处理相关的提示信息
 boot_json:
   start:
-    en: ===== Start processing boot.json
-    zh: ===== boot.json相關處理開始
+    en: "Processing boot.json files start"
+    zh_cn: "处理boot.json文件开始"
+    zh_tw: "處理boot.json檔案開始"
   end:
-    en: "##### End processing boot.json"
-    zh: "##### 處理boot.json文件結束"
+    en: "Processing boot.json files complete"
+    zh_cn: "处理boot.json文件完成"
+    zh_tw: "處理boot.json檔案完成"
   processing:
-    en: "    Processing boot.json file: %{path}"
-    zh: "    處理boot.json文件: %{path}"
+    en: "Processing: %{path}"
+    zh_cn: "正在处理: %{path}"
+    zh_tw: "正在處理: %{path}"
+  read_error:
+    en: "Failed to read boot.json: %{e}"
+    zh_cn: "读取boot.json失败: %{e}"
+    zh_tw: "讀取boot.json失敗: %{e}"
 
-# 壓縮相關的提示信息
+# 压缩相关的提示信息
 compress:
   start:
-    en: ===== Start compressing MOD folders
-    zh: ===== 壓縮所有的mod文件夾開始
+    en: "Compressing MOD folders start"
+    zh_cn: "压缩mod文件夹开始"
+    zh_tw: "壓縮mod資料夾開始"
   end:
-    en: "##### End compressing MOD folders"
-    zh: "##### 壓縮所有的mod文件夾結束"
+    en: "Compressing MOD folders complete"
+    zh_cn: "压缩mod文件夹完成"
+    zh_tw: "壓縮mod資料夾完成"
   done:
-    en: "    Finished compressing %{path}"
-    zh: "    壓縮 %{path} 完畢"
+    en: "Compressed: %{path}"
+    zh_cn: "已压缩: %{path}"
+    zh_tw: "已壓縮: %{path}"
 
-# 複製操作完成的提示信息
+# 复制操作完成的提示信息
 copy:
   done:
-    en: "    Finished copying folder %{path}"
-    zh: "    複製 %{path} 文件夾完畢"
+    en: "Copied: %{path}"
+    zh_cn: "已复制: %{path}"
+    zh_tw: "已複製: %{path}"
+
+# 檔案系統相關錯誤消息
+filesystem:
+  create_dir_failed:
+    en: "Failed to create directory: %{path}: %{e}"
+    zh_cn: "创建目录失败: %{path}: %{e}"
+    zh_tw: "建立目錄失敗: %{path}: %{e}"
+  create_file_failed:
+    en: "Failed to create file: %{e}"
+    zh_cn: "创建文件失败: %{e}"
+    zh_tw: "建立檔案失敗: %{e}"
+  remove_dir_failed:
+    en: "Failed to remove directory: %{path}: %{e}"
+    zh_cn: "删除目录失败: %{path}: %{e}"
+    zh_tw: "刪除目錄失敗: %{path}: %{e}"
+  read_file_failed:
+    en: "Failed to read file %{path}: %{e}"
+    zh_cn: "读取文件失败 %{path}: %{e}"
+    zh_tw: "讀取檔案失敗 %{path}: %{e}"
+  write_file_failed:
+    en: "Failed to write file %{path}: %{e}"
+    zh_cn: "写入文件失败 %{path}: %{e}"
+    zh_tw: "寫入檔案失敗 %{path}: %{e}"
+  copy_dir_failed:
+    en: "Failed to copy directory %{path}: %{msg}"
+    zh_cn: "复制目录失败 %{path}: %{msg}"
+    zh_tw: "複製目錄失敗 %{path}: %{msg}"
+  update_failed:
+    en: "Failed to update file list: %{msg}"
+    zh_cn: "更新文件列表失败: %{msg}"
+    zh_tw: "更新檔案列表失敗: %{msg}"
+  zip_failed:
+    en: "Failed to create zip file: %{msg}"
+    zh_cn: "创建zip文件失败: %{msg}"
+    zh_tw: "建立zip檔案失敗: %{msg}"
+  empty_dir:
+    en: "Directory is empty: %{path}"
+    zh_cn: "目录为空: %{path}"
+    zh_tw: "目錄為空: %{path}"
+  process_failed:
+    en: "Failed to process file: %{path}"
+    zh_cn: "处理文件失败: %{path}"
+    zh_tw: "處理檔案失敗: %{path}"
+  read_dir_failed:
+    en: "Failed to read directory %{path}: %{e}"
+    zh_cn: "无法读取目录 %{path}: %{e}"
+    zh_tw: "無法讀取目錄 %{path}: %{e}"
+  compression_failed:
+    en: "Failed to compress %{path}: %{e}"
+    zh_cn: "压缩失败 %{path}: %{e}"
+    zh_tw: "壓縮失敗 %{path}: %{e}"
+  glob_failed:
+    en: "Failed to read glob pattern"
+    zh_cn: "无法读取glob模式"
+    zh_tw: "無法讀取glob模式"
+
+# JSON 處理相關錯誤消息
+json:
+  parse_error:
+    en: "Failed to parse JSON: %{msg}"
+    zh_cn: "JSON解析失败: %{msg}"
+    zh_tw: "JSON解析失敗: %{msg}"
+  serialize_error:
+    en: "Failed to serialize JSON: %{msg}"
+    zh_cn: "序列化JSON失败: %{msg}"
+    zh_tw: "序列化JSON失敗: %{msg}"
+
+# 設定相關消息
+config:
+  invalid_locale:
+    en: "Invalid locale '%{msg}', using English as default"
+    zh_cn: "无效的语言环境设置 '%{msg}', 将使用英文作为默认语言"
+    zh_tw: "無效的語言環境設定 '%{msg}', 將使用英文作為預設語言"
+  invalid_log_level:
+    en: "Invalid log level '%{msg}', using 'info' as default"
+    zh_cn: "无效的日志等级 '%{msg}', 将使用 'info' 作为默认值"
+    zh_tw: "無效的日誌等級 '%{msg}', 將使用 'info' 作為預設值"
+
+# TypeScript 文件處理相關的提示信息
+ts:
+  start:
+    en: "Processing TypeScript files start"
+    zh_cn: "处理TypeScript文件开始"
+    zh_tw: "處理TypeScript檔案開始"
+  end:
+    en: "Processing TypeScript files complete"
+    zh_cn: "处理TypeScript文件完成"
+    zh_tw: "處理TypeScript檔案完成"
+  tsc_failed:
+    en: "Failed to execute tsc command"
+    zh_cn: "执行tsc命令失败"
+    zh_tw: "執行tsc命令失敗"
+  tsc_error:
+    en: "TypeScript compilation error: %{msg}"
+    zh_cn: "TypeScript编译错误: %{msg}"
+    zh_tw: "TypeScript編譯錯誤: %{msg}"
+  tsc_success:
+    en: "TypeScript compilation success: %{path}"
+    zh_cn: "TypeScript编译成功: %{path}"
+    zh_tw: "TypeScript編譯成功: %{path}"

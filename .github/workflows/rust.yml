@@ -10,42 +10,42 @@ env:
 
 permissions: write-all
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        rustup target add x86_64-unknown-linux-gnu
-        rustup target add x86_64-pc-windows-gnu
-        sudo apt-get update
-        sudo apt-get install mingw-w64
+      - name: Install dependencies
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          rustup target add x86_64-pc-windows-gnu
+          sudo apt-get update
+          sudo apt-get install mingw-w64
 
-    - name: Build
-      run: |
-        cargo clean
-        cargo build -r --target x86_64-unknown-linux-gnu
-        cargo build -r --target x86_64-pc-windows-gnu
-    # - name: Run tests
-    #   run: cargo test --verbose
+      - name: Build
+        run: |
+          cargo clean
+          cargo build -r --target x86_64-unknown-linux-gnu
+          cargo build -r --target x86_64-pc-windows-gnu
 
-    # - name: List build artifacts
-    #   run: |
-    #     # ls -a -r -l ./target
-    #     ls -a -r -l ./target/x86_64-unknown-linux-gnu/release
-    #     ls -a -r -l ./target/x86_64-pc-windows-gnu/release
+      # - name: Run tests
+      #   run: cargo test --verbose
 
-    - name: "Create release"
-      uses: marvinpinto/action-automatic-releases@latest
-      with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: "latest"
-        prerelease: true
-        title: "Development Build"
-        files: |
-          ./target/x86_64-pc-windows-gnu/release/mod-dev.exe
-          ./target/x86_64-unknown-linux-gnu/release/mod-dev
+      # - name: List build artifacts
+      #   run: |
+      #     # ls -a -r -l ./target
+      #     ls -a -r -l ./target/x86_64-unknown-linux-gnu/release
+      #     ls -a -r -l ./target/x86_64-pc-windows-gnu/release
+
+      - name: "Create release"
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development Build"
+          files: |
+            ./target/x86_64-pc-windows-gnu/release/mod-dev.exe
+            ./target/x86_64-unknown-linux-gnu/release/mod-dev
