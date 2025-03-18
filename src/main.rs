@@ -16,33 +16,32 @@ use std::io::{ Seek, Write };
 use std::path::Path;
 use walkdir::WalkDir;
 use zip::write::{ FileOptions, ZipWriter };
+use nest_struct::nest_struct;
 
 // 設定i18n
 rust_i18n::i18n!("locales", fallback = "en");
 
 /// 配置相關結構體和實現
-#[derive(Serialize, Deserialize, Debug)]
+#[nest_struct]
+#[derive(Serialize, Deserialize)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
   /// 日誌級別(warn/info/debug/trace)
   loglv: String,
   /// 路徑相關配置
-  path: PathCofg,
+  path: nest! {
+    /// 臨時文件存放路徑
+    tmp_path: String,
+    /// 輸出結果存放路徑
+    results_path: String,
+    /// mod源文件路徑
+    mods_path: String,
+  },
   /// 最後暫停?
   pause: bool,
   /// 處理 ts 文件?
   ts_process: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PathCofg {
-  /// 臨時文件存放路徑
-  tmp_path: String,
-  /// 輸出結果存放路徑
-  results_path: String,
-  /// mod源文件路徑
-  mods_path: String,
 }
 
 impl Cofg {
@@ -91,7 +90,8 @@ impl Cofg {
     cofg
   }
 
-  fn init_paths_and_logger(&self) {
+  /// 初始化路徑和日誌系統
+  fn init(&self) {
     for path in [&self.path.tmp_path, &self.path.results_path].iter() {
       let path_obj = std::path::Path::new(path);
       if path_obj.exists() {
@@ -129,7 +129,7 @@ impl Default for Cofg {
     Cofg {
       locale: "en".to_string(),
       loglv: "info".to_string(),
-      path: PathCofg {
+      path: CofgPath {
         tmp_path: "./tmp".to_string(),
         results_path: "./results".to_string(),
         mods_path: "./mods".to_string(),
@@ -139,7 +139,8 @@ impl Default for Cofg {
     }
   }
 }
-impl std::fmt::Display for PathCofg {
+
+impl std::fmt::Display for CofgPath {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -150,14 +151,16 @@ impl std::fmt::Display for PathCofg {
     )
   }
 }
+
 impl std::fmt::Display for Cofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
-      "locale: {},\nloglv: {},\npause: {},\npath: \n{}",
+      "locale: {},\nloglv: {},\npause: {},\nts_process: {},\npath: \n{}",
       self.locale,
       self.loglv,
       self.pause,
+      self.ts_process,
       self.path
     )
   }
@@ -240,7 +243,7 @@ fn check_empty_dirs(path: &std::path::PathBuf) -> bool {
   }
 }
 
-/// 主要處理 *.ts 文件的函數
+/// 主要處理 TypeScript 文件的函數
 fn process_ts_files(cofg: &Cofg) {
   info!("### {} ###", t!("ts.start"));
   for entry in glob(&format!("{}/*/", cofg.path.tmp_path)).expect(&t!("filesystem.glob_failed")) {
@@ -364,6 +367,7 @@ fn compress_mod_folders(cofg: &Cofg) {
 /// * `boot_json` - boot.json配置
 fn create_mod_zip(src_dir: &Path, zip_path: &Path, boot_json: BootJson) -> std::io::Result<()> {
   if true {
+    trace!("use zip lib");
     let file = File::create(zip_path)?;
     let mut zip = ZipWriter::new(file);
     let options = FileOptions::default()
@@ -449,7 +453,7 @@ fn copy_to_tmp(cofg: &Cofg) {
 fn main() {
   // 初始化配置
   let cofg = Cofg::new();
-  cofg.init_paths_and_logger();
+  cofg.init();
   debug!("{}", cofg);
   if cfg!(debug_assertions) {
     trace!("trace");
@@ -462,7 +466,7 @@ fn main() {
   // 複製文件到臨時目錄
   copy_to_tmp(&cofg);
   if cofg.ts_process {
-    // 處理*.ts文件
+    // 處理 TypeScript 文件
     process_ts_files(&cofg);
   }
   // 處理boot.json文件
@@ -470,6 +474,7 @@ fn main() {
   // 壓縮打包mod文件
   compress_mod_folders(&cofg);
   if cofg.pause {
+    print!("press any key to exit:");
     std::io::stdin().read_line(&mut String::new()).unwrap();
   }
 }
