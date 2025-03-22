@@ -14,7 +14,7 @@ pub struct BootJson {
   /// mod的唯一標識名稱
   pub name: String,
   /// mod版本號
-  version: Option<String>,
+  pub version: Option<String>,
   /// 額外文件列表(如README, License等)
   additionFile: Option<Vec<String>>,
   /// 圖片資源文件列表

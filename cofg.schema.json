@@ -49,7 +49,11 @@
     "ts_process": {
       "type": "boolean",
       "$comment": "處理 ts 文件?"
+    },
+    "file_name": {
+      "type": "string",
+      "$comment": "mod文件名"
     }
   },
-  "required": ["locale", "loglv", "path", "pause", "ts_process"]
+  "required": ["locale", "loglv", "path", "pause", "ts_process", "file_name"]
 }

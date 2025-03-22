@@ -42,6 +42,8 @@ struct Cofg {
   pause: bool,
   /// 處理 ts 文件?
   ts_process: bool,
+  /// file name
+  file_name: String,
 }
 
 impl Cofg {
@@ -136,6 +138,7 @@ impl Default for Cofg {
       },
       pause: true,
       ts_process: true,
+      file_name: "{name}.mod.zip".to_string(),
     }
   }
 }
@@ -350,7 +353,12 @@ fn compress_mod_folders(cofg: &Cofg) {
 
     match BootJson::new(boot_json_path.to_str().unwrap()) {
       Ok(boot_json) => {
-        let zip_path = results_dir.join(format!("{}.mod.zip", boot_json.name));
+        let zip_path = results_dir.join(
+          cofg.file_name
+            .replace("{name}", boot_json.name.as_str())
+            .replace("{ver}", boot_json.version.as_deref().unwrap_or("1.0.0"))
+        );
+
         match create_mod_zip(src_dir, &zip_path, boot_json) {
           Ok(_) => info!("    {}", t!("compress.done", path = src_dir.display())),
           Err(e) =>
