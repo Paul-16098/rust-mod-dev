@@ -1,5 +1,5 @@
 pub mod boot_json;
-use boot_json::*;
+use boot_json::BootJson;
 
 /// 本模組作為程序的主要入口點。包含以下主要功能：
 /// - 配置管理和初始化
@@ -23,14 +23,14 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 /// 配置相關結構體和實現
 #[nest_struct]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
   /// 日誌級別(warn/info/debug/trace)
   loglv: String,
   /// 路徑相關配置
-  path: nest! {
+  path: PathCofg! {
     /// 臨時文件存放路徑
     tmp_path: String,
     /// 輸出結果存放路徑
@@ -129,7 +129,7 @@ impl Default for Cofg {
     Cofg {
       locale: "en".to_string(),
       loglv: "info".to_string(),
-      path: CofgPath {
+      path: PathCofg {
         tmp_path: "./tmp".to_string(),
         results_path: "./results".to_string(),
         mods_path: "./mods".to_string(),
@@ -140,29 +140,34 @@ impl Default for Cofg {
   }
 }
 
-impl std::fmt::Display for CofgPath {
+impl std::fmt::Display for PathCofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "    mod: {}\n    tmp: {}\n    results: {}",
-      self.mods_path,
-      self.tmp_path,
-      self.results_path
-    )
+    serde_json
+      ::to_value(self)
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .iter()
+      .try_for_each(|(k, v)| { writeln!(f, "    {k}: {v}") })
   }
 }
 
 impl std::fmt::Display for Cofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "locale: {},\nloglv: {},\npause: {},\nts_process: {},\npath: \n{}",
-      self.locale,
-      self.loglv,
-      self.pause,
-      self.ts_process,
-      self.path
-    )
+    serde_json
+      ::to_value(self)
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .iter()
+      .try_for_each(|(k, v)| {
+        if k == "path" {
+          writeln!(f, "{k}:")?;
+          serde_json::from_value::<PathCofg>(v.clone()).unwrap().fmt(f)
+        } else {
+          writeln!(f, "{k}: {v}")
+        }
+      })
   }
 }
 
