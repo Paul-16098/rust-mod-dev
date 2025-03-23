@@ -4,6 +4,7 @@ use glob::glob;
 use log::trace;
 use serde::{ Deserialize, Serialize };
 use nest_struct::nest_struct;
+use rust_i18n::t; // 添加本地化支持
 
 /// boot.json的主要數據結構
 /// 包含mod的所有元數據和資源文件列表
@@ -60,11 +61,13 @@ impl BootJson {
   /// # 錯誤處理
   /// - 返回錯誤如果文件不存在或格式錯誤
   pub fn new(path: &str) -> Result<BootJson, Box<dyn std::error::Error>> {
-    let file_content = std::fs::read(path).map_err(|e| format!("無法讀取boot.json文件: {}", e))?;
+    let file_content = std::fs
+      ::read(path)
+      .map_err(|e| t!("filesystem.read_file_failed", path = path, e = e.to_string()))?;
 
     let mut json: BootJson = serde_json
       ::from_slice(&file_content)
-      .map_err(|e| format!("解析boot.json失敗: {}", e))?;
+      .map_err(|e| t!("json.parse_error", msg = e.to_string()))?;
 
     // 初始化所有Option字段
     // json.name = Some(json.name.unwrap_or_else(|| "unknown".to_string()));
@@ -137,7 +140,11 @@ impl BootJson {
     ];
 
     trace!("檢查路徑: {}", normalized_path);
-    lists.iter().any(|list| list.as_ref().unwrap().contains(&normalized_path))
+    lists.iter().any(|list| {
+      let r = list.as_ref().unwrap().contains(&normalized_path);
+      trace!("    {r}");
+      r
+    })
   }
 }
 

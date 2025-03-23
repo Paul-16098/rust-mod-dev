@@ -162,9 +162,9 @@ ts:
     zh_cn: "执行tsc命令失败"
     zh_tw: "執行tsc命令失敗"
   tsc_error:
-    en: "TypeScript compilation error: %{msg}"
-    zh_cn: "TypeScript编译错误: %{msg}"
-    zh_tw: "TypeScript編譯錯誤: %{msg}"
+    en: "TypeScript compilation error: %{path}(%{msg})"
+    zh_cn: "TypeScript编译错误: %{path}(%{msg})"
+    zh_tw: "TypeScript編譯錯誤: %{path}(%{msg})"
   tsc_success:
     en: "TypeScript compilation success: %{path}"
     zh_cn: "TypeScript编译成功: %{path}"

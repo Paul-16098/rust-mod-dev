@@ -11,11 +11,12 @@ use glob::glob;
 use log::{ debug, error, info, trace, warn };
 use rust_i18n::t;
 use serde::{ Deserialize, Serialize };
-use std::fs::{ self, remove_dir_all, File };
-use std::io::{ Seek, Write };
+use zip_extensions::ZipWriterExtensions;
+use std::fs::{ self, remove_dir_all, remove_file, File };
 use std::path::Path;
 use walkdir::WalkDir;
-use zip::write::{ FileOptions, ZipWriter };
+use zip::write::FileOptions;
+use zip::ZipWriter;
 use nest_struct::nest_struct;
 
 // 設定i18n
@@ -174,52 +175,6 @@ impl std::fmt::Display for Cofg {
   }
 }
 
-/// 將目錄添加到zip壓縮包中。
-/// 只會添加boot.json文件列表中包含的文件。
-fn add_to_zip<W>(path: &Path, zip: &mut ZipWriter<W>, boot_json: BootJson, options: FileOptions<()>)
-  where W: Write + Seek
-{
-  let base_path = Path::new(path).canonicalize().unwrap();
-  let walkdir = WalkDir::new(path).follow_links(true).sort_by_file_name();
-
-  for entry in walkdir.into_iter().filter_map(|e| e.ok()) {
-    let path = entry.path().canonicalize().unwrap();
-    trace!("{}   {}", path.display(), base_path.display());
-    let relative_path = path.strip_prefix(&base_path).unwrap();
-
-    // 跳過根目錄
-    if relative_path.as_os_str().is_empty() {
-      continue;
-    }
-
-    if path.is_file() {
-      // 檢查文件是否在boot.json列表中
-      if let Some(file_path) = relative_path.to_str().map(String::from) {
-        if !boot_json.in_list(&file_path) {
-          trace!("跳過未列出的文件: {}", file_path);
-          continue;
-        }
-
-        if let Err(e) = zip.start_file(file_path.clone(), options) {
-          warn!("無法在zip中創建文件 {}: {}", file_path, e);
-          continue;
-        }
-
-        if let Ok(mut file) = File::open(path) {
-          if let Err(e) = std::io::copy(&mut file, zip) {
-            warn!("無法複製文件內容 {}: {}", file_path, e);
-          }
-        }
-      }
-    } else if path.is_dir() && !check_empty_dirs(&path.to_path_buf()) {
-      let dir_path = format!("{}/", relative_path.to_string_lossy());
-      if let Err(e) = zip.add_directory(dir_path, options) {
-        warn!("無法添加目錄 {}: {}", relative_path.display(), e);
-      }
-    }
-  }
-}
-
 /// 檢查目錄是否為空
 ///
 /// # 參數
@@ -286,7 +241,14 @@ fn process_ts_files(cofg: &Cofg) {
             .expect(&t!("ts.tsc_failed"));
 
           if !output.status.success() {
-            error!("    {}", t!("ts.tsc_error", msg = String::from_utf8_lossy(&output.stderr)));
+            error!(
+              "    {}",
+              t!(
+                "ts.tsc_error",
+                msg = String::from_utf8_lossy(&output.stdout),
+                path = path.display()
+              )
+            );
           } else {
             info!("    {}", t!("ts.tsc_success", path = path.display()));
           }
@@ -378,23 +340,39 @@ fn compress_mod_folders(cofg: &Cofg) {
 /// * `src_dir` - 源目錄
 /// * `zip_path` - 目標zip文件路徑
 /// * `boot_json` - boot.json配置
-fn create_mod_zip(src_dir: &Path, zip_path: &Path, boot_json: BootJson) -> std::io::Result<()> {
-  if true {
-    trace!("use zip lib");
-    let file = File::create(zip_path)?;
-    let mut zip = ZipWriter::new(file);
-    let options = FileOptions::default()
-      .compression_method(zip::CompressionMethod::Deflated)
-      .unix_permissions(0o755)
-      .compression_level(None);
+fn create_mod_zip(
+  src_dir: &Path,
+  zip_path: &Path,
+  boot_json: BootJson
+) -> Result<(), Box<dyn std::error::Error>> {
+  let file = File::create(zip_path)?;
+  let zip = ZipWriter::new(file);
+  let options: FileOptions<()> = FileOptions::default()
+    .compression_method(zip::CompressionMethod::Deflated)
+    .unix_permissions(0o755)
+    .compression_level(None);
 
-    add_to_zip(src_dir, &mut zip, boot_json, options);
-
-    zip.finish()?;
-    Ok(())
-  } else {
-    Ok(())
+  for entry in WalkDir::new(src_dir).sort_by_file_name() {
+    match entry {
+      Err(e) => warn!("{}", e.to_string()),
+      Ok(entry) => {
+        let path = entry.path();
+        let name = path.strip_prefix(src_dir).unwrap();
+        if path.is_file() && !boot_json.in_list(name.to_str().unwrap()) {
+          remove_file(path)?;
+          trace!("    f:{}", name.display());
+        }
+        if path.is_dir() && check_empty_dirs(&path.to_path_buf()) {
+          remove_dir_all(path)?;
+          trace!("    f:{}", name.display());
+        }
+      }
+    }
   }
+
+  zip.create_from_directory_with_options(&src_dir.to_path_buf(), |_| options)?;
+
+  Ok(())
 }
 
 /// 文件系統操作相關的輔助函數
