@@ -3,16 +3,19 @@
 use glob::glob;
 use log::trace;
 use serde::{ Deserialize, Serialize };
+use nest_struct::nest_struct;
+use rust_i18n::t; // 添加本地化支持
 
 /// boot.json的主要數據結構
 /// 包含mod的所有元數據和資源文件列表
+#[nest_struct]
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct BootJson {
   /// mod的唯一標識名稱
   pub name: String,
   /// mod版本號
-  version: Option<String>,
+  pub version: Option<String>,
   /// 額外文件列表(如README, License等)
   additionFile: Option<Vec<String>>,
   /// 圖片資源文件列表
@@ -24,16 +27,33 @@ pub struct BootJson {
   /// CSS樣式文件列表
   styleFileList: Option<Vec<String>>,
   /// 插件配置列表
-  addonPlugin: Option<Vec<addonPlugin>>,
+  addonPlugin: Option<Vec<nest! {
+    /// 目標mod名稱
+    modName: String,
+    /// 插件名稱
+    addonName: String,
+    /// 目標mod版本
+    modVersion: String,
+    /// 插件參數列表
+    params: Vec<ParamEntry! {
+      passage: String,
+      findString: String,
+      replace: String,
+    }>,
+  }>>,
   /// mod依賴信息列表
-  dependenceInfo: Option<Vec<dependenceInfo>>,
+  dependenceInfo: Option<Vec<nest! {
+    /// 被依賴的mod名稱
+    modName: String,
+    /// 被依賴的mod版本要求
+    version: String,
+  }>>,
 }
 
 /// BootJson結構體的方法實現
 impl BootJson {
   /// 從文件路徑創建BootJson實例
   /// * `path` - boot.json文件的路徑
-  /// * 返回 Result<BootJson, Box<dyn std::error::Error>>
   /// # 示例
   /// ```rust
   /// let boot_json = BootJson::new("path/to/boot.json")?;
@@ -41,11 +61,13 @@ impl BootJson {
   /// # 錯誤處理
   /// - 返回錯誤如果文件不存在或格式錯誤
   pub fn new(path: &str) -> Result<BootJson, Box<dyn std::error::Error>> {
-    let file_content = std::fs::read(path).map_err(|e| format!("無法讀取boot.json文件: {}", e))?;
+    let file_content = std::fs
+      ::read(path)
+      .map_err(|e| t!("filesystem.read_file_failed", path = path, e = e.to_string()))?;
 
     let mut json: BootJson = serde_json
       ::from_slice(&file_content)
-      .map_err(|e| format!("解析boot.json失敗: {}", e))?;
+      .map_err(|e| t!("json.parse_error", msg = e.to_string()))?;
 
     // 初始化所有Option字段
     // json.name = Some(json.name.unwrap_or_else(|| "unknown".to_string()));
@@ -118,46 +140,12 @@ impl BootJson {
     ];
 
     trace!("檢查路徑: {}", normalized_path);
-    lists.iter().any(|list| list.as_ref().unwrap().contains(&normalized_path))
+    lists.iter().any(|list| {
+      let r = list.as_ref().unwrap().contains(&normalized_path);
+      trace!("    {r}");
+      r
+    })
   }
-}
-
-/// 表示修改條目的結構
-/// * `passage` - 要修改的文本段落
-/// * `findString` - 要查找的字符串
-/// * `replace` - 替換的內容
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-pub struct ParamEntry {
-  passage: String,
-  findString: String,
-  replace: String,
-}
-
-/// mod之間的依賴關係定義
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-pub struct dependenceInfo {
-  /// 被依賴的mod名稱
-  modName: String,
-  /// 被依賴的mod版本要求
-  version: String,
-}
-
-/// 插件系統的配置定義
-#[derive(Serialize, Deserialize, Debug)]
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-pub struct addonPlugin {
-  /// 目標mod名稱
-  modName: String,
-  /// 插件名稱
-  addonName: String,
-  /// 目標mod版本
-  modVersion: String,
-  /// 插件參數列表
-  params: Vec<ParamEntry>,
 }
 
 /// 掃描並添加特定類型的文件到文件列表中

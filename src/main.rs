@@ -1,5 +1,5 @@
 pub mod boot_json;
-use boot_json::*;
+use boot_json::BootJson;
 
 /// 本模組作為程序的主要入口點。包含以下主要功能：
 /// - 配置管理和初始化
@@ -11,11 +11,12 @@ use glob::glob;
 use log::{ debug, error, info, trace, warn };
 use rust_i18n::t;
 use serde::{ Deserialize, Serialize };
-use std::fs::{ self, remove_dir_all, File };
-use std::io::{ Seek, Write };
+use zip_extensions::ZipWriterExtensions;
+use std::fs::{ self, remove_dir_all, remove_file, File };
 use std::path::Path;
 use walkdir::WalkDir;
-use zip::write::{ FileOptions, ZipWriter };
+use zip::write::FileOptions;
+use zip::ZipWriter;
 use nest_struct::nest_struct;
 
 // 設定i18n
@@ -23,14 +24,14 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 /// 配置相關結構體和實現
 #[nest_struct]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
   /// 日誌級別(warn/info/debug/trace)
   loglv: String,
   /// 路徑相關配置
-  path: nest! {
+  path: PathCofg! {
     /// 臨時文件存放路徑
     tmp_path: String,
     /// 輸出結果存放路徑
@@ -42,6 +43,8 @@ struct Cofg {
   pause: bool,
   /// 處理 ts 文件?
   ts_process: bool,
+  /// file name
+  file_name: String,
 }
 
 impl Cofg {
@@ -129,86 +132,46 @@ impl Default for Cofg {
     Cofg {
       locale: "en".to_string(),
       loglv: "info".to_string(),
-      path: CofgPath {
+      path: PathCofg {
         tmp_path: "./tmp".to_string(),
         results_path: "./results".to_string(),
         mods_path: "./mods".to_string(),
       },
       pause: true,
       ts_process: true,
+      file_name: "{name}.mod.zip".to_string(),
     }
   }
 }
 
-impl std::fmt::Display for CofgPath {
+impl std::fmt::Display for PathCofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "    mod: {}\n    tmp: {}\n    results: {}",
-      self.mods_path,
-      self.tmp_path,
-      self.results_path
-    )
+    serde_json
+      ::to_value(self)
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .iter()
+      .try_for_each(|(k, v)| { writeln!(f, "    {k}: {v}") })
   }
 }
 
 impl std::fmt::Display for Cofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "locale: {},\nloglv: {},\npause: {},\nts_process: {},\npath: \n{}",
-      self.locale,
-      self.loglv,
-      self.pause,
-      self.ts_process,
-      self.path
-    )
-  }
-}
-
-/// 將目錄添加到zip壓縮包中。
-/// 只會添加boot.json文件列表中包含的文件。
-fn add_to_zip<W>(path: &Path, zip: &mut ZipWriter<W>, boot_json: BootJson, options: FileOptions<()>)
-  where W: Write + Seek
-{
-  let base_path = Path::new(path).canonicalize().unwrap();
-  let walkdir = WalkDir::new(path).follow_links(true).sort_by_file_name();
-
-  for entry in walkdir.into_iter().filter_map(|e| e.ok()) {
-    let path = entry.path().canonicalize().unwrap();
-    trace!("{}   {}", path.display(), base_path.display());
-    let relative_path = path.strip_prefix(&base_path).unwrap();
-
-    // 跳過根目錄
-    if relative_path.as_os_str().is_empty() {
-      continue;
-    }
-
-    if path.is_file() {
-      // 檢查文件是否在boot.json列表中
-      if let Some(file_path) = relative_path.to_str().map(String::from) {
-        if !boot_json.in_list(&file_path) {
-          trace!("跳過未列出的文件: {}", file_path);
-          continue;
+    serde_json
+      ::to_value(self)
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .iter()
+      .try_for_each(|(k, v)| {
+        if k == "path" {
+          writeln!(f, "{k}:")?;
+          serde_json::from_value::<PathCofg>(v.clone()).unwrap().fmt(f)
+        } else {
+          writeln!(f, "{k}: {v}")
         }
-
-        if let Err(e) = zip.start_file(file_path.clone(), options) {
-          warn!("無法在zip中創建文件 {}: {}", file_path, e);
-          continue;
-        }
-
-        if let Ok(mut file) = File::open(path) {
-          if let Err(e) = std::io::copy(&mut file, zip) {
-            warn!("無法複製文件內容 {}: {}", file_path, e);
-          }
-        }
-      }
-    } else if path.is_dir() && !check_empty_dirs(&path.to_path_buf()) {
-      let dir_path = format!("{}/", relative_path.to_string_lossy());
-      if let Err(e) = zip.add_directory(dir_path, options) {
-        warn!("無法添加目錄 {}: {}", relative_path.display(), e);
-      }
-    }
+      })
   }
 }
 
@@ -278,7 +241,14 @@ fn process_ts_files(cofg: &Cofg) {
             .expect(&t!("ts.tsc_failed"));
 
           if !output.status.success() {
-            error!("    {}", t!("ts.tsc_error", msg = String::from_utf8_lossy(&output.stderr)));
+            error!(
+              "    {}",
+              t!(
+                "ts.tsc_error",
+                msg = String::from_utf8_lossy(&output.stdout),
+                path = path.display()
+              )
+            );
           } else {
             info!("    {}", t!("ts.tsc_success", path = path.display()));
           }
@@ -345,7 +315,12 @@ fn compress_mod_folders(cofg: &Cofg) {
 
     match BootJson::new(boot_json_path.to_str().unwrap()) {
       Ok(boot_json) => {
-        let zip_path = results_dir.join(format!("{}.mod.zip", boot_json.name));
+        let zip_path = results_dir.join(
+          cofg.file_name
+            .replace("{name}", boot_json.name.as_str())
+            .replace("{ver}", boot_json.version.as_deref().unwrap_or("1.0.0"))
+        );
+
         match create_mod_zip(src_dir, &zip_path, boot_json) {
           Ok(_) => info!("    {}", t!("compress.done", path = src_dir.display())),
           Err(e) =>
@@ -365,23 +340,39 @@ fn compress_mod_folders(cofg: &Cofg) {
 /// * `src_dir` - 源目錄
 /// * `zip_path` - 目標zip文件路徑
 /// * `boot_json` - boot.json配置
-fn create_mod_zip(src_dir: &Path, zip_path: &Path, boot_json: BootJson) -> std::io::Result<()> {
-  if true {
-    trace!("use zip lib");
-    let file = File::create(zip_path)?;
-    let mut zip = ZipWriter::new(file);
-    let options = FileOptions::default()
-      .compression_method(zip::CompressionMethod::Deflated)
-      .unix_permissions(0o755)
-      .compression_level(None);
+fn create_mod_zip(
+  src_dir: &Path,
+  zip_path: &Path,
+  boot_json: BootJson
+) -> Result<(), Box<dyn std::error::Error>> {
+  let file = File::create(zip_path)?;
+  let zip = ZipWriter::new(file);
+  let options: FileOptions<()> = FileOptions::default()
+    .compression_method(zip::CompressionMethod::Deflated)
+    .unix_permissions(0o755)
+    .compression_level(None);
 
-    add_to_zip(src_dir, &mut zip, boot_json, options);
-
-    zip.finish()?;
-    Ok(())
-  } else {
-    Ok(())
+  for entry in WalkDir::new(src_dir).sort_by_file_name() {
+    match entry {
+      Err(e) => warn!("{}", e.to_string()),
+      Ok(entry) => {
+        let path = entry.path();
+        let name = path.strip_prefix(src_dir).unwrap();
+        if path.is_file() && !boot_json.in_list(name.to_str().unwrap()) {
+          remove_file(path)?;
+          trace!("    f:{}", name.display());
+        }
+        if path.is_dir() && check_empty_dirs(&path.to_path_buf()) {
+          remove_dir_all(path)?;
+          trace!("    f:{}", name.display());
+        }
+      }
+    }
   }
+
+  zip.create_from_directory_with_options(&src_dir.to_path_buf(), |_| options)?;
+
+  Ok(())
 }
 
 /// 文件系統操作相關的輔助函數
@@ -426,11 +417,22 @@ fn copy_to_tmp(cofg: &Cofg) {
   for entry in fs::read_dir(mods_dir).expect("Failed to read mods directory") {
     let entry = entry.expect("Failed to read entry");
     let path = entry.path();
-    if Path::new(&format!("{}/.ig", path.display())).exists() {
-      info!("    {}", t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\")));
-      continue;
-    }
+
     if path.is_dir() {
+      if Path::new(&format!("{}/.ig", path.display())).exists() {
+        info!(
+          "    {}",
+          t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\"))
+        );
+        continue;
+      }
+      if !Path::new(&format!("{}/boot.json", path.display())).exists() {
+        info!(
+          "    {}",
+          t!("copy_to_tmp.skip", path = path.display().to_string().replace("/", "\\"))
+        );
+        continue;
+      }
       let dest = tmp_dir.join(path.file_name().unwrap());
       if let Err(e) = fs_utils::copy_dir_all(&path, &dest) {
         warn!(
