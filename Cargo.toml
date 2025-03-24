@@ -9,10 +9,10 @@
     serde = { version = "1.0.219", features = [
         "derive",
     ] }
-    zip = "2.4.2"
+    zip = "2.5.0"
     walkdir = "2.5.0"
     colog = "1.3.0"
-    log = "0.4.26"
+    log = "0.4.27"
     rust-i18n = "3.1.3"
     config = "0.15.11"
     nest_struct = "0.5.3"
