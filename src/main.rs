@@ -1,11 +1,6 @@
 pub mod boot_json;
 use boot_json::BootJson;
 
-/// 本模組作為程序的主要入口點。包含以下主要功能：
-/// - 配置管理和初始化
-/// - 文件系統操作
-/// - mod文件處理和壓縮打包
-
 use config::Config;
 use glob::glob;
 use log::{ debug, error, info, trace, warn };
@@ -354,7 +349,7 @@ fn create_mod_zip(
 
   for entry in WalkDir::new(src_dir).sort_by_file_name() {
     match entry {
-      Err(e) => warn!("{}", e.to_string()),
+      Err(e) => warn!("{}", e),
       Ok(entry) => {
         let path = entry.path();
         let name = path.strip_prefix(src_dir).unwrap();

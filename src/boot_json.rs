@@ -1,5 +1,3 @@
-/// mod boot_json
-
 use glob::glob;
 use log::trace;
 use serde::{ Deserialize, Serialize };
