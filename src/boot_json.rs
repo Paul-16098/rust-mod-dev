@@ -171,7 +171,6 @@ pub fn scan_and_add_files(
 pub fn process_file_path(path: &std::path::Path, cwd: &std::path::Path) -> Option<String> {
   path
     .strip_prefix(cwd)
-    .ok()?
-    .to_str()
-    .map(|s| s.to_string())
+    .ok()
+    .and_then(|p| p.to_str().map(|s| s.to_string()))
 }

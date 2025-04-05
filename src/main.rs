@@ -1,8 +1,8 @@
+mod tests;
 pub mod boot_json;
 use boot_json::BootJson;
 
-use clap::Parser;
-use human_panic::setup_panic;
+use clap::{ Parser, ArgAction };
 use config::Config;
 use glob::glob;
 use log::{ debug, error, info, trace, warn };
@@ -52,10 +52,23 @@ impl Cofg {
   fn new() -> Cofg {
     let settings = Config::builder()
       .add_source(config::File::with_name("./cofg.json"))
-      .add_source(Cli::parse())
       .build()
       .unwrap();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
+
+    let cli = Cli::parse();
+    if let Some(locale) = cli.locale {
+      cofg.locale = locale;
+    }
+    if let Some(loglv) = cli.loglv {
+      cofg.loglv = loglv;
+    }
+    if let Some(pause) = cli.pause {
+      cofg.pause = pause;
+    }
+    if let Some(ts_process) = cli.ts_process {
+      cofg.ts_process = ts_process;
+    }
 
     // 改進語言環境處理邏輯
     cofg.locale = (
@@ -173,12 +186,28 @@ impl std::fmt::Display for Cofg {
   }
 }
 
-#[derive(Parser)]
-struct Cli {}
-impl Default for Cli {
-  fn default() -> Self {
-    Cli {}
-  }
+#[derive(Parser, Debug)]
+#[clap(
+  about = concat!(
+    "a tool for mod dev\n",
+    concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"))
+  ),
+  version = env!("CARGO_PKG_VERSION"),
+  after_long_help = env!("CARGO_PKG_REPOSITORY")
+)]
+struct Cli {
+  /// 語言環境
+  #[clap(long)]
+  locale: Option<String>,
+  /// 日誌級別
+  #[clap(long)]
+  loglv: Option<String>,
+  /// 是否處理ts文件
+  #[clap(long = "tsp", action = ArgAction::SetTrue)]
+  ts_process: Option<bool>,
+  /// 是否暫停
+  #[clap(short, long, action = ArgAction::SetTrue)]
+  pause: Option<bool>,
 }
 
 /// 檢查目錄是否為空
@@ -459,11 +488,14 @@ fn copy_to_tmp(cofg: &Cofg) {
 /// 4. 處理boot.json文件
 /// 5. 打包所有mod為zip文件
 fn main() {
-  setup_panic(human_panic::metadata!());
+  debug!(env!("CARGO_PKG_VERSION"));
+  human_panic::setup_panic!();
+
   // 初始化配置
   let cofg = Cofg::new();
   cofg.init();
   debug!("{}", cofg);
+  debug!("{:?}", Cli::parse());
   if cfg!(debug_assertions) {
     trace!("trace");
     debug!("debug");
