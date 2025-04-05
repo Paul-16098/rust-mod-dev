@@ -1,6 +1,8 @@
 pub mod boot_json;
 use boot_json::BootJson;
 
+use clap::Parser;
+use human_panic::setup_panic;
 use config::Config;
 use glob::glob;
 use log::{ debug, error, info, trace, warn };
@@ -19,7 +21,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 /// 配置相關結構體和實現
 #[nest_struct]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
@@ -50,6 +52,7 @@ impl Cofg {
   fn new() -> Cofg {
     let settings = Config::builder()
       .add_source(config::File::with_name("./cofg.json"))
+      .add_source(Cli::parse())
       .build()
       .unwrap();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
@@ -61,7 +64,7 @@ impl Cofg {
         "zh_tw" | "zh-tw" | "tw" => "zh_tw",
         "en" | "en_us" | "en-us" => "en",
         o => {
-          println!("{}", t!("config.invalid_locale", msg = o));
+          warn!("{}", t!("config.invalid_locale", msg = o));
           "en"
         }
       }
@@ -70,7 +73,7 @@ impl Cofg {
     match cofg.loglv.as_str() {
       "warn" | "info" | "debug" | "trace" => {}
       o => {
-        println!("{}", t!("config.invalid_log_level", msg = o));
+        warn!("{}", t!("config.invalid_log_level", msg = o));
         cofg.loglv = "info".to_string();
       }
     }
@@ -116,7 +119,7 @@ impl Cofg {
       "trace" => {
         colog_cofg.filter_level(log::LevelFilter::Trace);
       }
-      o => println!("{}", t!("config.invalid_log_level", msg = o)),
+      o => warn!("{}", t!("config.invalid_log_level", msg = o)),
     }
     colog_cofg.init();
   }
@@ -167,6 +170,14 @@ impl std::fmt::Display for Cofg {
           writeln!(f, "{k}: {v}")
         }
       })
+  }
+}
+
+#[derive(Parser)]
+struct Cli {}
+impl Default for Cli {
+  fn default() -> Self {
+    Cli {}
   }
 }
 
@@ -448,6 +459,7 @@ fn copy_to_tmp(cofg: &Cofg) {
 /// 4. 處理boot.json文件
 /// 5. 打包所有mod為zip文件
 fn main() {
+  setup_panic(human_panic::metadata!());
   // 初始化配置
   let cofg = Cofg::new();
   cofg.init();
@@ -457,7 +469,9 @@ fn main() {
     debug!("debug");
     info!("info");
     warn!("warn");
-    error!("erroe");
+    error!("error");
+    eprintln!("stderr");
+    println!("stdout");
   }
 
   // 複製文件到臨時目錄
@@ -471,7 +485,7 @@ fn main() {
   // 壓縮打包mod文件
   compress_mod_folders(&cofg);
   if cofg.pause {
-    print!("press any key to exit:");
+    info!("press any key to exit:");
     std::io::stdin().read_line(&mut String::new()).unwrap();
   }
 }
