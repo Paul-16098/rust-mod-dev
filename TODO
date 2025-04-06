@@ -1,4 +1,4 @@
 Todo:
-  [] add gui
-  [] watch file
+  # [] add gui 無必要
+  # [] watch file 無必要
   [x] add cmd args
