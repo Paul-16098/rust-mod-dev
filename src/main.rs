@@ -21,7 +21,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 /// 配置相關結構體和實現
 #[nest_struct]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
@@ -56,20 +56,6 @@ impl Cofg {
       .unwrap();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
-    let cli = Cli::parse();
-    if let Some(locale) = cli.locale {
-      cofg.locale = locale;
-    }
-    if let Some(loglv) = cli.loglv {
-      cofg.loglv = loglv;
-    }
-    if let Some(pause) = cli.pause {
-      cofg.pause = pause;
-    }
-    if let Some(ts_process) = cli.ts_process {
-      cofg.ts_process = ts_process;
-    }
-
     // 改進語言環境處理邏輯
     cofg.locale = (
       match cofg.locale.to_lowercase().as_str() {
@@ -90,8 +76,23 @@ impl Cofg {
         cofg.loglv = "info".to_string();
       }
     }
+    cofg.write_file();
+    cofg
+  }
 
-    match serde_json::to_string_pretty(&cofg) {
+  fn load_cli(mut self, cli: Cli) {
+    if let Some(v) = cli.locale {
+      self.locale = v;
+    }
+    if let Some(v) = cli.loglv {
+      self.loglv = v;
+    }
+    self.pause = cli.pause;
+    self.ts_process = cli.ts_process;
+  }
+
+  fn write_file(&self) {
+    match serde_json::to_string_pretty(self) {
       Ok(json_string) => {
         if let Err(e) = std::fs::write("./cofg.json", json_string) {
           warn!("{}", t!("filesystem.write_file_failed", path = "cofg.json", e = e));
@@ -101,11 +102,12 @@ impl Cofg {
         warn!("{}", t!("json.serialize_error", msg = e.to_string()));
       }
     }
-    cofg
   }
 
   /// 初始化路徑和日誌系統
   fn init(&self) {
+    self.clone().load_cli(Cli::parse());
+
     for path in [&self.path.tmp_path, &self.path.results_path].iter() {
       let path_obj = std::path::Path::new(path);
       if path_obj.exists() {
@@ -186,7 +188,7 @@ impl std::fmt::Display for Cofg {
   }
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Serialize)]
 #[clap(
   about = concat!(
     "a tool for mod dev\n",
@@ -204,10 +206,21 @@ struct Cli {
   loglv: Option<String>,
   /// 是否處理ts文件
   #[clap(long = "tsp", action = ArgAction::SetTrue)]
-  ts_process: Option<bool>,
+  ts_process: bool,
   /// 是否暫停
   #[clap(short, long, action = ArgAction::SetTrue)]
-  pause: Option<bool>,
+  pause: bool,
+}
+impl std::fmt::Display for Cli {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    serde_json
+      ::to_value(self)
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .iter()
+      .try_for_each(|(k, v)| { writeln!(f, "{k}: {v}") })
+  }
 }
 
 /// 檢查目錄是否為空
@@ -488,15 +501,16 @@ fn copy_to_tmp(cofg: &Cofg) {
 /// 4. 處理boot.json文件
 /// 5. 打包所有mod為zip文件
 fn main() {
-  debug!(env!("CARGO_PKG_VERSION"));
   human_panic::setup_panic!();
 
   // 初始化配置
   let cofg = Cofg::new();
   cofg.init();
-  debug!("{}", cofg);
-  debug!("{:?}", Cli::parse());
+  cofg.write_file();
   if cfg!(debug_assertions) {
+    debug!("{}", cofg);
+    debug!("{}", Cli::parse());
+
     trace!("trace");
     debug!("debug");
     info!("info");
