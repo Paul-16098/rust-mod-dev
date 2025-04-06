@@ -47,8 +47,6 @@ struct Cofg {
 impl Cofg {
   /// 配置初始化函數
   /// * 讀取並解析cofg.json文件
-  /// * 設置程序語言環境
-  /// * 初始化日誌系統
   fn new() -> Cofg {
     let settings = Config::builder()
       .add_source(config::File::with_name("./cofg.json"))
@@ -80,6 +78,7 @@ impl Cofg {
     cofg
   }
 
+  /// form cli load args
   fn load_cli(mut self, cli: Cli) {
     if let Some(v) = cli.locale {
       self.locale = v;
@@ -91,6 +90,7 @@ impl Cofg {
     self.ts_process = cli.ts_process;
   }
 
+  /// Returns the write file of this [`Cofg`].
   fn write_file(&self) {
     match serde_json::to_string_pretty(self) {
       Ok(json_string) => {
@@ -105,6 +105,8 @@ impl Cofg {
   }
 
   /// 初始化路徑和日誌系統
+  /// * 設置程序語言環境
+  /// * 初始化日誌系統
   fn init(&self) {
     self.clone().load_cli(Cli::parse());
 
@@ -199,10 +201,10 @@ impl std::fmt::Display for Cofg {
 )]
 struct Cli {
   /// 語言環境
-  #[clap(long)]
+  #[clap(long, short = 'i')]
   locale: Option<String>,
   /// 日誌級別
-  #[clap(long)]
+  #[clap(long, short)]
   loglv: Option<String>,
   /// 是否處理ts文件
   #[clap(long = "tsp", action = ArgAction::SetTrue)]
