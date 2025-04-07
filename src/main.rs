@@ -19,6 +19,19 @@ use nest_struct::nest_struct;
 // 設定i18n
 rust_i18n::i18n!("locales", fallback = "en");
 
+const BASE_VERSION: &str = concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"));
+
+lazy_static::lazy_static! {
+  static ref VERSION: String = format!("{}-{}Build", BASE_VERSION, match option_env!("GIT_SHA") {
+    None => "Local".to_string(),
+    Some(sha) =>
+      format!("{}({})", sha, match option_env!("ACTIONS_ID") {
+        None => "Err of option_env!(ACTIONS_ID)",
+        Some(id) => id,
+      }),
+  });
+}
+
 /// 配置相關結構體和實現
 #[nest_struct]
 #[derive(Serialize, Deserialize, Clone)]
@@ -192,12 +205,9 @@ impl std::fmt::Display for Cofg {
 
 #[derive(Parser, Debug, Serialize)]
 #[clap(
-  about = concat!(
-    "a tool for mod dev\n",
-    concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"))
-  ),
-  version = env!("CARGO_PKG_VERSION"),
-  after_long_help = env!("CARGO_PKG_REPOSITORY")
+  about = format!("a tool for mod dev\n{}", VERSION.as_str()),
+  version = VERSION.as_str(),
+  after_help = env!("CARGO_PKG_REPOSITORY")
 )]
 struct Cli {
   /// 語言環境

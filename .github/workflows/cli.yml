@@ -7,6 +7,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  GIT_SHA: ${{ github.sha }}
+  ACTIONS_ID: actions/runs/${{ github.run_id }}
 
 permissions: write-all
 

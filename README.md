@@ -64,6 +64,8 @@
 mod-dev --locale zh_tw --loglv debug --tsp --pause
 ```
 
+詳細結構請參考 [main.rs@Cli](./src/main.rs)
+
 ## 進階配置
 
 ### 文件過濾

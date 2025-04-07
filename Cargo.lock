@@ -854,6 +854,7 @@ dependencies = [
  "config",
  "glob",
  "human-panic",
+ "lazy_static",
  "log",
  "nest_struct",
  "rust-i18n",

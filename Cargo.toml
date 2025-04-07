@@ -28,3 +28,4 @@
         "derive",
     ] }
     human-panic = "2.0.2"
+    lazy_static = "1.5.0"
