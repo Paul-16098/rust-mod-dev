@@ -64,3 +64,4 @@ jobs:
           extra-files: |
             LICENSE.txt
             README.md
+          release-tag-prefix:
