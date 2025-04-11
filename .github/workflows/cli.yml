@@ -60,3 +60,7 @@ jobs:
         with:
           executable-name: mod-dev
           target: ${{ matrix.platform.target }}
+          changes-file:
+          extra-files: |
+            LICENSE.txt
+            README.md
