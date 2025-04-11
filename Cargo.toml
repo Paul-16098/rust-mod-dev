@@ -24,7 +24,7 @@
     config = "0.15.11"
     nest_struct = "0.5.3"
     # zip-extensions = "0.8.1"
-    zip-extensions = { git = "https://github.com/andriipopazov/zip-extensions-rs/tree/fix/2.6.0-zip-template" } # fix zip 2.6.0
+    zip-extensions = { git = "https://github.com/andriipopazov/zip-extensions-rs", branch = "fix/2.6.0-zip-template" } # fix zip 2.6.0
     clap = { version = "4.5.35", features = [
         "derive",
     ] }
