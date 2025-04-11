@@ -1,5 +1,10 @@
 # MOD 開發工具
 
+## 發布
+
+[Dev build](https://github.com/Paul-16098/rust-mod-dev/actions/workflows/cli.yml)
+[Release build](https://github.com/Paul-16098/rust-mod-dev/release)
+
 ## 功能特點
 
 - 自動化文件處理和打包
