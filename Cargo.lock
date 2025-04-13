@@ -867,9 +867,9 @@ dependencies = [
 
 [[package]]
 name = "nest_struct"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "508e573d50cb54ba13e6ebe6da654855d36f9305cbba3fb804f2a67c4f2bce02"
+checksum = "6be21386e82d4a77234f75636ee2381ca415d45d35cf35025b0375d82ee1a96e"
 dependencies = [
  "convert_case 0.7.1",
  "proc-macro2",
