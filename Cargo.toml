@@ -8,7 +8,7 @@
     readme = "./README.md"
     homepage = "https://github.com/Paul-16098/rust-mod-dev"
     repository = "https://github.com/Paul-16098/rust-mod-dev"
-    edition = "2024"
+    edition = "2021"
 
 [dependencies]
     glob = "0.3.2"
@@ -22,10 +22,10 @@
     log = "0.4.27"
     rust-i18n = "3.1.4"
     config = "0.15.11"
-    nest_struct = "0.5.4"
+    nest_struct = "0.5.3"
     # zip-extensions = "0.8.1"
     zip-extensions = { git = "https://github.com/andriipopazov/zip-extensions-rs", branch = "fix/2.6.0-zip-template" } # fix zip 2.6.0
-    clap = { version = "4.5.36", features = [
+    clap = { version = "4.5.35", features = [
         "derive",
     ] }
     human-panic = "2.0.2"
