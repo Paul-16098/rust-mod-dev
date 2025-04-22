@@ -1,11 +1,10 @@
+//! main
+
+mod tests;
+// 引入模塊和依賴
 pub mod boot_json;
 use boot_json::BootJson;
-
-/// 本模組作為程序的主要入口點。包含以下主要功能：
-/// - 配置管理和初始化
-/// - 文件系統操作
-/// - mod文件處理和壓縮打包
-
+use clap::{ Parser, ArgAction };
 use config::Config;
 use glob::glob;
 use log::{ debug, error, info, trace, warn };
@@ -22,9 +21,23 @@ use nest_struct::nest_struct;
 // 設定i18n
 rust_i18n::i18n!("locales", fallback = "en");
 
+// 定義常量和靜態變量
+const BASE_VERSION: &str = concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"));
+
+lazy_static::lazy_static! {
+  static ref VERSION: String = format!("{}-{}Build", BASE_VERSION, match option_env!("GIT_SHA") {
+    None => "Local".to_string(),
+    Some(sha) =>
+      format!("{}({})", sha, match option_env!("ACTIONS_ID") {
+        None => "Err of option_env!(ACTIONS_ID)",
+        Some(id) => id,
+      }),
+  });
+}
+
 /// 配置相關結構體和實現
 #[nest_struct]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
@@ -50,8 +63,6 @@ struct Cofg {
 impl Cofg {
   /// 配置初始化函數
   /// * 讀取並解析cofg.json文件
-  /// * 設置程序語言環境
-  /// * 初始化日誌系統
   fn new() -> Cofg {
     let settings = Config::builder()
       .add_source(config::File::with_name("./cofg.json"))
@@ -66,7 +77,7 @@ impl Cofg {
         "zh_tw" | "zh-tw" | "tw" => "zh_tw",
         "en" | "en_us" | "en-us" => "en",
         o => {
-          println!("{}", t!("config.invalid_locale", msg = o));
+          warn!("{}", t!("config.invalid_locale", msg = o));
           "en"
         }
       }
@@ -75,12 +86,29 @@ impl Cofg {
     match cofg.loglv.as_str() {
       "warn" | "info" | "debug" | "trace" => {}
       o => {
-        println!("{}", t!("config.invalid_log_level", msg = o));
+        warn!("{}", t!("config.invalid_log_level", msg = o));
         cofg.loglv = "info".to_string();
       }
     }
+    cofg.write_file();
+    cofg
+  }
 
-    match serde_json::to_string_pretty(&cofg) {
+  /// form cli load args
+  fn load_cli(mut self, cli: Cli) {
+    if let Some(v) = cli.locale {
+      self.locale = v;
+    }
+    if let Some(v) = cli.loglv {
+      self.loglv = v;
+    }
+    self.pause = cli.pause;
+    self.ts_process = cli.ts_process;
+  }
+
+  /// Returns the write file of this [`Cofg`].
+  fn write_file(&self) {
+    match serde_json::to_string_pretty(self) {
       Ok(json_string) => {
         if let Err(e) = std::fs::write("./cofg.json", json_string) {
           warn!("{}", t!("filesystem.write_file_failed", path = "cofg.json", e = e));
@@ -90,11 +118,14 @@ impl Cofg {
         warn!("{}", t!("json.serialize_error", msg = e.to_string()));
       }
     }
-    cofg
   }
 
   /// 初始化路徑和日誌系統
+  /// * 設置程序語言環境
+  /// * 初始化日誌系統
   fn init(&self) {
+    self.clone().load_cli(Cli::parse());
+
     for path in [&self.path.tmp_path, &self.path.results_path].iter() {
       let path_obj = std::path::Path::new(path);
       if path_obj.exists() {
@@ -121,7 +152,7 @@ impl Cofg {
       "trace" => {
         colog_cofg.filter_level(log::LevelFilter::Trace);
       }
-      o => println!("{}", t!("config.invalid_log_level", msg = o)),
+      o => warn!("{}", t!("config.invalid_log_level", msg = o)),
     }
     colog_cofg.init();
   }
@@ -172,6 +203,38 @@ impl std::fmt::Display for Cofg {
           writeln!(f, "{k}: {v}")
         }
       })
+  }
+}
+
+#[derive(Parser, Debug, Serialize)]
+#[clap(
+  about = format!("a tool for mod dev\n{}", VERSION.as_str()),
+  version = VERSION.as_str(),
+  after_help = env!("CARGO_PKG_REPOSITORY")
+)]
+struct Cli {
+  /// 語言環境
+  #[clap(long, short = 'i')]
+  locale: Option<String>,
+  /// 日誌級別
+  #[clap(long, short)]
+  loglv: Option<String>,
+  /// 是否處理ts文件
+  #[clap(long = "tsp", action = ArgAction::SetTrue)]
+  ts_process: bool,
+  /// 是否暫停
+  #[clap(short, long, action = ArgAction::SetTrue)]
+  pause: bool,
+}
+impl std::fmt::Display for Cli {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    serde_json
+      ::to_value(self)
+      .unwrap()
+      .as_object()
+      .unwrap()
+      .iter()
+      .try_for_each(|(k, v)| { writeln!(f, "{k}: {v}") })
   }
 }
 
@@ -354,7 +417,7 @@ fn create_mod_zip(
 
   for entry in WalkDir::new(src_dir).sort_by_file_name() {
     match entry {
-      Err(e) => warn!("{}", e.to_string()),
+      Err(e) => warn!("{}", e),
       Ok(entry) => {
         let path = entry.path();
         let name = path.strip_prefix(src_dir).unwrap();
@@ -446,37 +509,48 @@ fn copy_to_tmp(cofg: &Cofg) {
   info!("=== {} ===", t!("copy_to_tmp.done"));
 }
 
-/// 主要的處理流程:
-/// 1. 初始化配置(讀取cofg.json)
-/// 2. 設置語言環境和日誌級別
-/// 3. 將mod目錄內容復制到臨時目錄
-/// 4. 處理boot.json文件
-/// 5. 打包所有mod為zip文件
+// 主函數
 fn main() {
+  // 設置 panic 處理
+  human_panic::setup_panic!();
+
   // 初始化配置
   let cofg = Cofg::new();
   cofg.init();
-  debug!("{}", cofg);
+  cofg.write_file();
+
+  // 調試模式下打印配置信息
   if cfg!(debug_assertions) {
+    debug!("{}", cofg);
+    debug!("{}", Cli::parse());
+
+    // 測試不同日誌級別的輸出
     trace!("trace");
     debug!("debug");
     info!("info");
     warn!("warn");
-    error!("erroe");
+    error!("error");
+    eprintln!("stderr");
+    println!("stdout");
   }
 
   // 複製文件到臨時目錄
   copy_to_tmp(&cofg);
+
+  // 如果需要處理 TypeScript 文件
   if cofg.ts_process {
-    // 處理 TypeScript 文件
     process_ts_files(&cofg);
   }
-  // 處理boot.json文件
+
+  // 處理 boot.json 文件
   process_boot_json_files(&cofg);
-  // 壓縮打包mod文件
+
+  // 壓縮打包 mod 文件
   compress_mod_folders(&cofg);
+
+  // 如果需要暫停，等待用戶輸入
   if cofg.pause {
-    print!("press any key to exit:");
+    info!("press any key to exit:");
     std::io::stdin().read_line(&mut String::new()).unwrap();
   }
 }

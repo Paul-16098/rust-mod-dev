@@ -52,7 +52,7 @@
     },
     "file_name": {
       "type": "string",
-      "$comment": "mod文件名"
+      "$comment": "mod文件名\n{name} -- mod名稱\n{ver} -- mod版本"
     }
   },
   "required": ["locale", "loglv", "path", "pause", "ts_process", "file_name"]
