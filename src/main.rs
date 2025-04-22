@@ -1,7 +1,9 @@
+//! main
+
 mod tests;
+// 引入模塊和依賴
 pub mod boot_json;
 use boot_json::BootJson;
-
 use clap::{ Parser, ArgAction };
 use config::Config;
 use glob::glob;
@@ -19,6 +21,7 @@ use nest_struct::nest_struct;
 // 設定i18n
 rust_i18n::i18n!("locales", fallback = "en");
 
+// 定義常量和靜態變量
 const BASE_VERSION: &str = concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"));
 
 lazy_static::lazy_static! {
@@ -506,23 +509,22 @@ fn copy_to_tmp(cofg: &Cofg) {
   info!("=== {} ===", t!("copy_to_tmp.done"));
 }
 
-/// 主要的處理流程:
-/// 1. 初始化配置(讀取cofg.json)
-/// 2. 設置語言環境和日誌級別
-/// 3. 將mod目錄內容復制到臨時目錄
-/// 4. 處理boot.json文件
-/// 5. 打包所有mod為zip文件
+// 主函數
 fn main() {
+  // 設置 panic 處理
   human_panic::setup_panic!();
 
   // 初始化配置
   let cofg = Cofg::new();
   cofg.init();
   cofg.write_file();
+
+  // 調試模式下打印配置信息
   if cfg!(debug_assertions) {
     debug!("{}", cofg);
     debug!("{}", Cli::parse());
 
+    // 測試不同日誌級別的輸出
     trace!("trace");
     debug!("debug");
     info!("info");
@@ -534,14 +536,19 @@ fn main() {
 
   // 複製文件到臨時目錄
   copy_to_tmp(&cofg);
+
+  // 如果需要處理 TypeScript 文件
   if cofg.ts_process {
-    // 處理 TypeScript 文件
     process_ts_files(&cofg);
   }
-  // 處理boot.json文件
+
+  // 處理 boot.json 文件
   process_boot_json_files(&cofg);
-  // 壓縮打包mod文件
+
+  // 壓縮打包 mod 文件
   compress_mod_folders(&cofg);
+
+  // 如果需要暫停，等待用戶輸入
   if cofg.pause {
     info!("press any key to exit:");
     std::io::stdin().read_line(&mut String::new()).unwrap();

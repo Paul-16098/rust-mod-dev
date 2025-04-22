@@ -1,3 +1,5 @@
+//! boot.json的主要數據結構
+
 use glob::glob;
 use log::trace;
 use serde::{ Deserialize, Serialize };
@@ -156,21 +158,32 @@ pub fn scan_and_add_files(
   cwd: &std::path::Path
 ) -> Result<(), Box<dyn std::error::Error>> {
   for path in glob(pattern)?.flatten() {
-    if let Some(rel_path) = process_file_path(&path, cwd) {
-      if !file_list.contains(&rel_path) {
-        file_list.push(rel_path.replace("\\", "/"));
+    match process_file_path(&path, cwd) {
+      Ok(rel_path) => {
+        if !file_list.contains(&rel_path) {
+          file_list.push(rel_path.replace("\\", "/"));
+        }
+      }
+      Err(e) => {
+        log::warn!("Skipping file due to error: {}", e);
       }
     }
   }
   Ok(())
 }
 
+#[inline]
 /// 處理文件路徑，將絕對路徑轉換為相對路徑
 /// * `path` - 要處理的文件路徑
 /// * `cwd` - 當前工作目錄
-pub fn process_file_path(path: &std::path::Path, cwd: &std::path::Path) -> Option<String> {
+pub fn process_file_path(
+  path: &std::path::Path,
+  cwd: &std::path::Path
+) -> Result<String, Box<dyn std::error::Error>> {
   path
     .strip_prefix(cwd)
-    .ok()
-    .and_then(|p| p.to_str().map(|s| s.to_string()))
+    .map(|p| p.to_string_lossy().to_string())
+    .map_err(|_|
+      format!("Failed to strip prefix: {} from path: {}", cwd.display(), path.display()).into()
+    )
 }
