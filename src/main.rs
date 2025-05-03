@@ -19,7 +19,7 @@ use zip::ZipWriter;
 use nest_struct::nest_struct;
 
 // 設定i18n
-rust_i18n::i18n!("locales", fallback = "en");
+rust_i18n::i18n!();
 
 // 定義常量和靜態變量
 const BASE_VERSION: &str = concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"));
@@ -37,7 +37,7 @@ lazy_static::lazy_static! {
 
 /// 配置相關結構體和實現
 #[nest_struct]
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
   locale: String,
@@ -70,28 +70,34 @@ impl Cofg {
       .unwrap();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
-    // 改進語言環境處理邏輯
-    cofg.locale = (
-      match cofg.locale.to_lowercase().as_str() {
-        "zh_cn" | "zh-cn" | "cn" | "zh" => "zh_cn",
-        "zh_tw" | "zh-tw" | "tw" => "zh_tw",
-        "en" | "en_us" | "en-us" => "en",
-        o => {
-          warn!("{}", t!("config.invalid_locale", msg = o));
-          "en"
-        }
-      }
-    ).to_string();
-
-    match cofg.loglv.as_str() {
-      "warn" | "info" | "debug" | "trace" => {}
-      o => {
-        warn!("{}", t!("config.invalid_log_level", msg = o));
-        cofg.loglv = "info".to_string();
-      }
-    }
+    cofg.locale = cofg.normalize_locale();
+    cofg.loglv = cofg.validate_log_level().unwrap_or(cofg.loglv);
     cofg.write_file();
     cofg
+  }
+
+  /// 正規化語言環境
+  fn normalize_locale(&self) -> String {
+    match self.locale.to_lowercase().as_str() {
+      "zh_cn" | "zh-cn" | "cn" | "zh" => "zh_cn".to_string(),
+      "zh_tw" | "zh-tw" | "tw" => "zh_tw".to_string(),
+      "en" | "en_us" | "en-us" => "en".to_string(),
+      o => {
+        warn!("{}", t!("config.invalid_locale", msg = o));
+        "en".to_string()
+      }
+    }
+  }
+
+  /// 驗證日誌級別
+  fn validate_log_level(&self) -> Option<String> {
+    match self.loglv.as_str() {
+      "warn" | "info" | "debug" | "trace" => None,
+      o => {
+        warn!("{}", t!("config.invalid_log_level", msg = o));
+        Some("info".to_string())
+      }
+    }
   }
 
   /// form cli load args
@@ -174,7 +180,7 @@ impl Default for Cofg {
     }
   }
 }
-
+/*
 impl std::fmt::Display for PathCofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     serde_json
@@ -205,13 +211,15 @@ impl std::fmt::Display for Cofg {
       })
   }
 }
+*/
 
 #[derive(Parser, Debug, Serialize)]
 #[clap(
-  about = format!("a tool for mod dev\n{}", VERSION.as_str()),
+  about = "a tool for mod dev",
   version = VERSION.as_str(),
   after_help = env!("CARGO_PKG_REPOSITORY")
 )]
+/// 命令行參數結構體
 struct Cli {
   /// 語言環境
   #[clap(long, short = 'i')]
@@ -226,6 +234,7 @@ struct Cli {
   #[clap(short, long, action = ArgAction::SetTrue)]
   pause: bool,
 }
+/*
 impl std::fmt::Display for Cli {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     serde_json
@@ -237,6 +246,7 @@ impl std::fmt::Display for Cli {
       .try_for_each(|(k, v)| { writeln!(f, "{k}: {v}") })
   }
 }
+*/
 
 /// 檢查目錄是否為空
 ///
@@ -521,8 +531,7 @@ fn main() {
 
   // 調試模式下打印配置信息
   if cfg!(debug_assertions) {
-    debug!("{}", cofg);
-    debug!("{}", Cli::parse());
+    debug!("{:#?}", cofg);
 
     // 測試不同日誌級別的輸出
     trace!("trace");
@@ -541,7 +550,6 @@ fn main() {
   if cofg.ts_process {
     process_ts_files(&cofg);
   }
-
   // 處理 boot.json 文件
   process_boot_json_files(&cofg);
 

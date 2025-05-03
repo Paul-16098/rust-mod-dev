@@ -9,6 +9,9 @@
     homepage = "https://github.com/Paul-16098/rust-mod-dev"
     repository = "https://github.com/Paul-16098/rust-mod-dev"
     edition = "2024"
+    [package.metadata.i18n]
+        default-locale = "en"
+        load-path      = "locales"
 
 [dependencies]
     glob = "0.3.2"
@@ -24,7 +27,6 @@
     config = "0.15.11"
     nest_struct = "0.5.4"
     zip-extensions = "0.8.2"
-    # zip-extensions = { git = "https://github.com/andriipopazov/zip-extensions-rs", branch = "fix/2.6.0-zip-template" } # fix zip 2.6.0
     clap = { version = "4.5.37", features = [
         "derive",
     ] }
