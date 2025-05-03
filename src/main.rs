@@ -21,19 +21,7 @@ use nest_struct::nest_struct;
 // 設定i18n
 rust_i18n::i18n!();
 
-// 定義常量和靜態變量
-const BASE_VERSION: &str = concat!(env!("CARGO_PKG_NAME"), "@", env!("CARGO_PKG_VERSION"));
-
-lazy_static::lazy_static! {
-  static ref VERSION: String = format!("{}-{}Build", BASE_VERSION, match option_env!("GIT_SHA") {
-    None => "Local".to_string(),
-    Some(sha) =>
-      format!("{}({})", sha, match option_env!("ACTIONS_ID") {
-        None => "Err of option_env!(ACTIONS_ID)",
-        Some(id) => id,
-      }),
-  });
-}
+const VERSION: &str = env!("VERSION");
 
 /// 配置相關結構體和實現
 #[nest_struct]
@@ -214,11 +202,7 @@ impl std::fmt::Display for Cofg {
 */
 
 #[derive(Parser, Debug, Serialize)]
-#[clap(
-  about = "a tool for mod dev",
-  version = VERSION.as_str(),
-  after_help = env!("CARGO_PKG_REPOSITORY")
-)]
+#[clap(about = "a tool for mod dev", version = VERSION, after_help = env!("CARGO_PKG_REPOSITORY"))]
 /// 命令行參數結構體
 struct Cli {
   /// 語言環境
