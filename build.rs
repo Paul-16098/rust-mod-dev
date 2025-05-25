@@ -13,17 +13,17 @@ fn main() {
         .arg("rev-parse")
         .arg("HEAD")
         .output()
-        .expect("Failed to execute command");
+        .expect("build.rs: Failed to execute command");
 
       if output.status.success() {
         let commit_hash_str = String::from_utf8_lossy(&output.stdout);
         commit_hash_str.trim().to_string()
       } else {
-        println!("cargo::warning=Git command failed with status: {}", output.status);
+        println!("cargo::warning=build.rs: Git command failed with output: {:#?}", output);
         String::from("unknown")
       }
     } else {
-      println!("cargo::warning=No .git directory found, skipping git versioning");
+      println!("cargo::warning=build.rs: No .git directory found, skipping git versioning");
       String::from("unknown")
     }
   };
@@ -37,7 +37,7 @@ fn main() {
       Ok(id) => format!("actions/runs/{id}"),
       Err(std::env::VarError::NotPresent) => "Local".to_string(),
       Err(e) => {
-        println!("cargo::error={}", e);
+        println!("cargo::error=build.rs: {e}");
         "unknown".to_string()
       }
     }

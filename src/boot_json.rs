@@ -17,17 +17,17 @@ pub struct BootJson {
   /// mod版本號
   pub version: Option<String>,
   /// 額外文件列表(如README, License等)
-  additionFile: Option<Vec<String>>,
+  pub(crate) additionFile: Option<Vec<String>>,
   /// 圖片資源文件列表
-  imgFileList: Option<Vec<String>>,
+  pub(crate) imgFileList: Option<Vec<String>>,
   /// JavaScript腳本文件列表
-  scriptFileList: Option<Vec<String>>,
+  pub(crate) scriptFileList: Option<Vec<String>>,
   /// Twee故事腳本文件列表
-  tweeFileList: Option<Vec<String>>,
+  pub(crate) tweeFileList: Option<Vec<String>>,
   /// CSS樣式文件列表
-  styleFileList: Option<Vec<String>>,
+  pub(crate) styleFileList: Option<Vec<String>>,
   /// 插件配置列表
-  addonPlugin: Option<Vec<nest! {
+  pub(crate) addonPlugin: Option<Vec<nest! {
     /// 目標mod名稱
     modName: String,
     /// 插件名稱
@@ -42,7 +42,7 @@ pub struct BootJson {
     }>,
   }>>,
   /// mod依賴信息列表
-  dependenceInfo: Option<Vec<nest! {
+  pub(crate) dependenceInfo: Option<Vec<nest! {
     /// 被依賴的mod名稱
     modName: String,
     /// 被依賴的mod版本要求
