@@ -13,24 +13,24 @@ use super::r#const::VERSION;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) struct Cofg {
   /// 程序使用的語言環境(zh_cn/zh_tw/en)
-  locale: String,
+  pub(crate) locale: String,
   /// 日誌級別(warn/info/debug/trace)
-  loglv: String,
+  pub(crate) loglv: String,
   /// 路徑相關配置
-  pub path: PathCofg! {
+  pub(crate) path: PathCofg! {
     /// 臨時文件存放路徑
-    pub tmp_path: String,
+    pub(crate) tmp_path: String,
     /// 輸出結果存放路徑
-    pub results_path: String,
+    pub(crate) results_path: String,
     /// mod源文件路徑
-    pub mods_path: String,
+    pub(crate) mods_path: String,
   },
   /// 最後暫停?
-  pub pause: bool,
+  pub(crate) pause: bool,
   /// 處理 ts 文件?
-  pub ts_process: bool,
+  pub(crate) ts_process: bool,
   /// file name
-  pub file_name: String,
+  pub(crate) file_name: String,
 }
 
 impl Cofg {
@@ -41,6 +41,19 @@ impl Cofg {
       .add_source(config::File::with_name("./cofg.json"))
       .build()
       .unwrap();
+    let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
+
+    cofg.locale = cofg.normalize_locale();
+    cofg.loglv = cofg.validate_log_level().unwrap_or(cofg.loglv);
+    cofg.write_file();
+    cofg
+  }
+
+  pub(crate) fn new_from_json_str(d: &str) -> Cofg {
+    let settings = Config::builder()
+      .add_source(config::File::from_str(d, config::FileFormat::Json))
+      .build()
+      .unwrap_or_default();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
     cofg.locale = cofg.normalize_locale();
