@@ -1,4 +1,4 @@
-name: cli
+name: Build&release
 
 on:
   push:
@@ -66,6 +66,7 @@ jobs:
 
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
+        id: Publish-artifacts-and-release
         with:
           executable-name: mod-dev
           target: ${{ matrix.platform.target }}
@@ -73,18 +74,3 @@ jobs:
           extra-files: |
             LICENSE.txt
             README.md
-
-      - name: Uploading to release
-        uses: ncipollo/release-action@main
-        with:
-          artifacts: |
-            *.tar.zst
-            *.zip
-            *.deb
-            *.rpm
-          allowUpdates: true
-          makeLatest: true
-          commit: ${{ github.sha }}
-          generateReleaseNotes: true
-          prerelease: true
-          name: Dev build
