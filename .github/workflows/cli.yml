@@ -2,11 +2,12 @@ name: cli
 
 on:
   push:
+    paths: |
+      *.rs
   pull_request:
   workflow_dispatch:
 
 env:
-  CARGO_TERM_COLOR: always
   ACTIONS_ID: ${{ github.run_id }}
 
 permissions: write-all
@@ -63,7 +64,6 @@ jobs:
           strip: true
 
       - name: Publish artifacts and release
-        id: a
         uses: houseabsolute/actions-rust-release@v0
         with:
           executable-name: mod-dev
@@ -72,3 +72,17 @@ jobs:
           extra-files: |
             LICENSE.txt
             README.md
+
+      - name: Uploading to release
+        uses: ncipollo/release-action@main
+        with:
+          artifacts: |
+            *.tar.zst
+            *.zip
+            *.deb
+            *.rpm
+          allowUpdates: true
+          makeLatest: true
+        #   commit: ${{ github.ref }}
+          generateReleaseNotes: true
+          prerelease: true
