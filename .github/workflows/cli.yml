@@ -2,9 +2,9 @@ name: cli
 
 on:
   push:
-    paths: |
-      *.rs
-      .github/workflows/cli.yml
+    paths:
+      - "*.rs"
+      - ".github/workflows/cli.yml"
   pull_request:
   workflow_dispatch:
 
@@ -87,3 +87,4 @@ jobs:
           commit: ${{ github.ref }}
           generateReleaseNotes: true
           prerelease: true
+          name: Dev build
