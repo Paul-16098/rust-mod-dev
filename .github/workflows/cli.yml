@@ -84,7 +84,7 @@ jobs:
             *.rpm
           allowUpdates: true
           makeLatest: true
-          commit: ${{ github.ref }}
+          commit: ${{ github.sha }}
           generateReleaseNotes: true
           prerelease: true
           name: Dev build
