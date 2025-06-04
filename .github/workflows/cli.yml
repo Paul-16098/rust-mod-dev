@@ -4,6 +4,7 @@ on:
   push:
     paths: |
       *.rs
+      .github/workflows/cli.yml
   pull_request:
   workflow_dispatch:
 
