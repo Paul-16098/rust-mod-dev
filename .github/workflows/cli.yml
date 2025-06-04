@@ -83,6 +83,6 @@ jobs:
             *.rpm
           allowUpdates: true
           makeLatest: true
-        #   commit: ${{ github.ref }}
+          commit: ${{ github.ref }}
           generateReleaseNotes: true
           prerelease: true
