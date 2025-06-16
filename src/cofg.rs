@@ -40,7 +40,7 @@ impl Cofg {
     let settings = Config::builder()
       .add_source(config::File::with_name("./cofg.json"))
       .build()
-      .unwrap();
+      .unwrap_or_default();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
     cofg.locale = cofg.normalize_locale();
@@ -49,6 +49,7 @@ impl Cofg {
     cofg
   }
 
+  #[allow(dead_code)]
   pub(crate) fn new_from_json_str(d: &str) -> Cofg {
     let settings = Config::builder()
       .add_source(config::File::from_str(d, config::FileFormat::Json))
@@ -87,7 +88,7 @@ impl Cofg {
   }
 
   /// form cli load args
-  fn load_cli(mut self, cli: Cli) {
+  fn load_cli(&mut self, cli: Cli) {
     if let Some(v) = cli.locale {
       self.locale = v;
     }
@@ -115,8 +116,8 @@ impl Cofg {
   /// 初始化路徑和日誌系統
   /// * 設置程序語言環境
   /// * 初始化日誌系統
-  pub(crate) fn init(&self) {
-    self.clone().load_cli(Cli::parse());
+  pub(crate) fn init(&mut self) {
+    self.load_cli(Cli::parse());
 
     for path in [&self.path.tmp_path, &self.path.results_path].iter() {
       let path_obj = std::path::Path::new(path);

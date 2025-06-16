@@ -237,7 +237,7 @@ fn main() {
   human_panic::setup_panic!();
 
   // 初始化配置
-  let cofg = Cofg::new();
+  let mut cofg = Cofg::new();
   cofg.init();
   cofg.write_file();
 
