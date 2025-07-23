@@ -170,7 +170,7 @@ fn create_mod_zip(
 
   for entry in WalkDir::new(src_dir).sort_by_file_name() {
     match entry {
-      Err(e) => warn!("{}", e),
+      Err(e) => warn!("{e}"),
       Ok(entry) => {
         let path = entry.path();
         let name = path.strip_prefix(src_dir).unwrap();
@@ -243,7 +243,7 @@ fn main() {
 
   // 調試模式下打印配置信息
   if cfg!(debug_assertions) {
-    debug!("{:#?}", cofg);
+    debug!("{cofg:#?}");
 
     // 測試不同日誌級別的輸出
     trace!("trace");

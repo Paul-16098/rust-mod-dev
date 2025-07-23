@@ -103,18 +103,18 @@ impl BootJson {
 
     // 處理附加文件
     for file in ["README.md", "README.txt", "License.txt", "License"].iter() {
-      let file_path = format!("{}/{}", show_cwd, file);
+      let file_path = format!("{show_cwd}/{file}");
       if std::path::Path::new(&file_path).exists() && !addition_files.contains(&file.to_string()) {
         addition_files.push(file.to_string());
       }
     }
 
     // 處理各類型文件
-    scan_and_add_files(&format!("{}/**/*.png", show_cwd), img_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.js", show_cwd), script_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.css", show_cwd), style_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.twee", show_cwd), twee_files, cwd)?;
-    scan_and_add_files(&format!("{}/**/*.js.map", show_cwd), addition_files, cwd)?;
+    scan_and_add_files(&format!("{show_cwd}/**/*.png"), img_files, cwd)?;
+    scan_and_add_files(&format!("{show_cwd}/**/*.js"), script_files, cwd)?;
+    scan_and_add_files(&format!("{show_cwd}/**/*.css"), style_files, cwd)?;
+    scan_and_add_files(&format!("{show_cwd}/**/*.twee"), twee_files, cwd)?;
+    scan_and_add_files(&format!("{show_cwd}/**/*.js.map"), addition_files, cwd)?;
 
     Ok(())
   }
@@ -139,7 +139,7 @@ impl BootJson {
       &self.additionFile,
     ];
 
-    trace!("檢查路徑: {}", normalized_path);
+    trace!("檢查路徑: {normalized_path}");
     lists.iter().any(|list| {
       let r = list.as_ref().unwrap().contains(&normalized_path);
       trace!("    {r}");
@@ -165,7 +165,7 @@ pub fn scan_and_add_files(
         }
       }
       Err(e) => {
-        log::warn!("Skipping file due to error: {}", e);
+        log::warn!("Skipping file due to error: {e}");
       }
     }
   }

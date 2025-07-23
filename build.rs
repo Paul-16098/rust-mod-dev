@@ -19,7 +19,7 @@ fn main() {
         let commit_hash_str = String::from_utf8_lossy(&output.stdout);
         commit_hash_str.trim().to_string()
       } else {
-        println!("cargo::warning=build.rs: Git command failed with output: {:#?}", output);
+        println!("cargo::warning=build.rs: Git command failed with output: {output:#?}");
         String::from("unknown")
       }
     } else {

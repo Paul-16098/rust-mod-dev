@@ -115,7 +115,7 @@ mod-dev --locale zh_tw --loglv debug --tsp --pause
 
 ## 開發環境
 
-- Rust 2021 Edition
+- Rust 2024 Edition
 
 ## 構建方法
 
