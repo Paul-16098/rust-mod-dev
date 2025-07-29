@@ -4,7 +4,7 @@
     authors = [
         "Paul-16098",
     ]
-    license-file = "./LICENSE.txt"
+    license = "MIT"
     readme = "./README.md"
     homepage = "https://github.com/Paul-16098/rust-mod-dev"
     repository = "https://github.com/Paul-16098/rust-mod-dev"
