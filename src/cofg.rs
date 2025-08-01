@@ -1,5 +1,7 @@
 //! 配置相關結構體和實現
 
+use std::path::Path;
+
 use clap::{ Parser, ArgAction };
 use log::warn;
 use nest_struct::nest_struct;
@@ -43,10 +45,27 @@ impl Cofg {
       .unwrap_or_default();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
-    cofg.locale = cofg.normalize_locale();
-    cofg.loglv = cofg.validate_log_level().unwrap_or(cofg.loglv);
+    cofg.validate();
+    if !Path::new("./cofg.json").exists() {
+      cofg.new_user_select_cofg();
+    }
     cofg.write_file();
     cofg
+  }
+
+  fn validate(&mut self) {
+    self.locale = match self.locale.to_lowercase().as_str() {
+      "zh_cn" | "zh-cn" | "cn" | "zh" => "zh_cn".to_string(),
+      "zh_tw" | "zh-tw" | "tw" => "zh_tw".to_string(),
+      "en" | "en_us" | "en-us" => "en".to_string(),
+      o => {
+        warn!("{}", t!("config.invalid_locale", msg = o));
+        "en".to_string()
+      }
+    };
+    if !log::Level::iter().any(|v| { v.as_str() == self.loglv.to_uppercase() }) {
+      self.loglv = "info".to_string();
+    }
   }
 
   #[allow(dead_code)]
@@ -57,34 +76,8 @@ impl Cofg {
       .unwrap_or_default();
     let mut cofg: Cofg = settings.try_deserialize().unwrap_or_default();
 
-    cofg.locale = cofg.normalize_locale();
-    cofg.loglv = cofg.validate_log_level().unwrap_or(cofg.loglv);
-    cofg.write_file();
+    cofg.validate();
     cofg
-  }
-
-  /// 正規化語言環境
-  fn normalize_locale(&self) -> String {
-    match self.locale.to_lowercase().as_str() {
-      "zh_cn" | "zh-cn" | "cn" | "zh" => "zh_cn".to_string(),
-      "zh_tw" | "zh-tw" | "tw" => "zh_tw".to_string(),
-      "en" | "en_us" | "en-us" => "en".to_string(),
-      o => {
-        warn!("{}", t!("config.invalid_locale", msg = o));
-        "en".to_string()
-      }
-    }
-  }
-
-  /// 驗證日誌級別
-  fn validate_log_level(&self) -> Option<String> {
-    match self.loglv.as_str() {
-      "warn" | "info" | "debug" | "trace" => None,
-      o => {
-        warn!("{}", t!("config.invalid_log_level", msg = o));
-        Some("info".to_string())
-      }
-    }
   }
 
   /// form cli load args
@@ -93,10 +86,51 @@ impl Cofg {
       self.locale = v;
     }
     if let Some(v) = cli.loglv {
-      self.loglv = v;
+      self.loglv = v.as_str().to_string();
     }
-    self.pause = cli.pause;
-    self.ts_process = cli.ts_process;
+    if let Some(v) = cli.pause {
+      self.pause = v;
+    }
+    if let Some(v) = cli.ts_process {
+      self.ts_process = v;
+    }
+  }
+
+  fn new_user_select_cofg(&mut self) {
+    use dialoguer::{ Select, Confirm, Input };
+    println!("New user:");
+    // ToDo: i18n
+    let cl = &["zh_cn", "zh_tw", "en"];
+    self.locale = String::from(
+      cl[Select::new().with_prompt("locale?").items(cl).default(2).interact().ok().unwrap_or(2)]
+    );
+    self.ts_process = Confirm::new()
+      .with_prompt("ts_process?")
+      .default(true)
+      .show_default(true)
+      .interact()
+      .ok()
+      .unwrap_or(true);
+    self.pause = Confirm::new()
+      .with_prompt("pause?")
+      .default(true)
+      .show_default(true)
+      .interact()
+      .ok()
+      .unwrap_or(true);
+    self.file_name = Input::<String>
+      ::new()
+      .with_prompt("file name(you can use `{ver}` and `{name}`)?")
+      .with_initial_text("{name}.mod.zip")
+      .default("{name}.mod.zip".to_string())
+      .show_default(false)
+      .interact_text()
+      .ok()
+      .unwrap_or("{name}.mod.zip".to_string());
+    let cl = &["warn", "info", "debug", "trace"];
+    self.loglv = String::from(
+      cl[Select::new().with_prompt("log lv?").items(cl).default(1).interact().ok().unwrap_or(1)]
+    );
   }
 
   /// Returns the write file of this [`Cofg`].
@@ -132,20 +166,25 @@ impl Cofg {
 
     rust_i18n::set_locale(&self.locale);
     let mut colog_cofg = colog::default_builder();
-    match self.loglv.as_str() {
-      "warn" => {
-        colog_cofg.filter_level(log::LevelFilter::Warn);
+    if !cfg!(test) {
+      match self.loglv.as_str() {
+        "warn" => {
+          colog_cofg.filter_level(log::LevelFilter::Warn);
+        }
+        "info" => {
+          colog_cofg.filter_level(log::LevelFilter::Info);
+        }
+        "debug" => {
+          colog_cofg.filter_level(log::LevelFilter::Debug);
+        }
+        "trace" => {
+          colog_cofg.filter_level(log::LevelFilter::Trace);
+        }
+        o => warn!("{}", t!("config.invalid_log_level", msg = o)),
       }
-      "info" => {
-        colog_cofg.filter_level(log::LevelFilter::Info);
-      }
-      "debug" => {
-        colog_cofg.filter_level(log::LevelFilter::Debug);
-      }
-      "trace" => {
-        colog_cofg.filter_level(log::LevelFilter::Trace);
-      }
-      o => warn!("{}", t!("config.invalid_log_level", msg = o)),
+    } else {
+      println!("is test");
+      colog_cofg.filter_level(log::LevelFilter::Trace);
     }
     colog_cofg.init();
   }
@@ -167,7 +206,7 @@ impl Default for Cofg {
     }
   }
 }
-/*
+
 impl std::fmt::Display for PathCofg {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     serde_json
@@ -198,9 +237,8 @@ impl std::fmt::Display for Cofg {
       })
   }
 }
-*/
 
-#[derive(Parser, Debug, Serialize)]
+#[derive(Parser, Debug)]
 #[clap(about = "a tool for mod dev", version = VERSION, after_help = env!("CARGO_PKG_REPOSITORY"))]
 /// 命令行參數結構體
 struct Cli {
@@ -208,25 +246,12 @@ struct Cli {
   #[clap(long, short = 'i')]
   locale: Option<String>,
   /// 日誌級別
-  #[clap(long, short)]
-  loglv: Option<String>,
+  #[clap(long, short, value_enum)]
+  loglv: Option<log::Level>,
   /// 是否處理ts文件
   #[clap(long = "tsp", action = ArgAction::SetTrue)]
-  ts_process: bool,
+  ts_process: Option<bool>,
   /// 是否暫停
   #[clap(short, long, action = ArgAction::SetTrue)]
-  pause: bool,
+  pause: Option<bool>,
 }
-/*
-impl std::fmt::Display for Cli {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    serde_json
-      ::to_value(self)
-      .unwrap()
-      .as_object()
-      .unwrap()
-      .iter()
-      .try_for_each(|(k, v)| { writeln!(f, "{k}: {v}") })
-  }
-}
-*/

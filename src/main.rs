@@ -270,7 +270,7 @@ fn main() {
 
   // 如果需要暫停，等待用戶輸入
   if cofg.pause {
-    info!("press any key to exit:");
+    print!("press any key to exit:");
     std::io::stdin().read_line(&mut String::new()).unwrap();
   }
 }

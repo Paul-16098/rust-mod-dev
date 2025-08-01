@@ -6,6 +6,11 @@ use std::path::Path;
 use crate::cofg::Cofg;
 
 #[test]
+fn on_f() {
+  unsafe { std::env::set_var("key", "value") }
+}
+
+#[test]
 fn test_process_file_path() {
   use crate::boot_json::process_file_path;
   assert_eq!(
@@ -174,4 +179,45 @@ fn test_new_from_json_str_invalid_json() {
   assert_eq!(cofg.loglv, "info");
   assert_eq!(cofg.path.tmp_path, "./tmp");
   remove_test_file();
+}
+#[test]
+fn test_main() {
+  let r = tempfile::TempDir::new().unwrap();
+  let rp = r.path();
+  let mrp = rp.join("mod");
+  std::fs::create_dir(&mrp).unwrap();
+  let rrp = rp.join("results");
+  std::fs::create_dir(&rrp).unwrap();
+  let trp = rp.join("tmp");
+  std::fs::create_dir(&trp).unwrap();
+  let mut c = crate::Cofg::new_from_json_str(
+    &r#"{"pause":false,"path":{"mods_path":"{mrp}","results_path":"{rrp}","tmp_path":"{trp}"}}"#
+      .replace("{mrp}", mrp.to_str().unwrap())
+      .replace("{rrp}", rrp.to_str().unwrap())
+      .replace("{trp}", trp.to_str().unwrap())
+  );
+  c.init();
+  crate::copy_to_tmp(&c);
+  crate::process_ts_files(&c);
+  crate::process_boot_json_files(&c);
+  crate::compress_mod_folders(&c);
+  r.close().unwrap();
+}
+#[test]
+fn test_boot_json_new() {
+  use crate::BootJson;
+  let r = tempfile::TempDir::new().unwrap();
+  let bjp = r.path().join("b.json");
+  std::fs::write(&bjp, r#"{"name":"t1"}"#).unwrap();
+  BootJson::new(bjp.to_str().unwrap()).unwrap();
+}
+#[test]
+fn test_cofg_new() {
+  std::fs::write(Path::new("./cofg.json"), r#"{}"#).unwrap();
+  crate::Cofg::new();
+}
+#[test]
+fn test_cofg_new_ne() {
+  let _ = std::fs::remove_file(Path::new("./cofg.json"));
+  crate::Cofg::new().init();
 }
