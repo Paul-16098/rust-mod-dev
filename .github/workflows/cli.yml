@@ -3,7 +3,7 @@ name: Build&release
 on:
   push:
     paths:
-      - "*.rs"
+      - "**/*.rs"
       - ".github/workflows/cli.yml"
   pull_request:
   workflow_dispatch:
@@ -47,14 +47,7 @@ jobs:
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Configure sccache
-        uses: actions/github-script@v8
-        with:
-          script: |
-            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+        uses: actions/checkout@v4
 
       - name: Build binary
         uses: houseabsolute/actions-rust-cross@v1
@@ -65,10 +58,10 @@ jobs:
           strip: true
 
       - name: Publish artifacts and release
-        uses: houseabsolute/actions-rust-release@v0
+        uses: fvj/actions-rust-release@jvf/add-glob-support-to-extra-files
         id: Publish-artifacts-and-release
         with:
-          executable-name: mod-dev
+          executable-name: my-http-server
           target: ${{ matrix.platform.target }}
           changes-file: ""
           extra-files: |
