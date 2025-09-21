@@ -61,7 +61,7 @@ jobs:
         uses: fvj/actions-rust-release@jvf/add-glob-support-to-extra-files
         id: Publish-artifacts-and-release
         with:
-          executable-name: my-http-server
+          executable-name: mod-dev
           target: ${{ matrix.platform.target }}
           changes-file: ""
           extra-files: |
