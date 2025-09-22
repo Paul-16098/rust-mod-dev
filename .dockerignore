@@ -1,0 +1,19 @@
+# Reduce build context size
+/target
+/tmp
+/results
+/mods
+
+# Git & VCS
+/.git
+.gitignore
+
+# CI & tooling
+.github
+.vscode
+
+# Local configs & caches
+cofg.json
+**/*.log
+**/.DS_Store
+**/Thumbs.db
