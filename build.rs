@@ -5,7 +5,7 @@ use std::env::var;
 fn main() {
   #[allow(clippy::single_element_loop)]
   for path in ["build.rs"] {
-    println!("cargo::rerun-if-changed={path}");
+    println!("cargo:rerun-if-changed={path}");
   }
 
   let commit_hash = {
@@ -30,7 +30,7 @@ fn main() {
   };
 
   println!(
-    "cargo::rustc-env=VERSION={}({} Profile)-{commit_hash}({})",
+    "cargo:rustc-env=VERSION={}({} Profile)-{commit_hash}({})",
     var("CARGO_PKG_VERSION").unwrap(),
     var("PROFILE").unwrap(),
     match var("ACTIONS_ID") {

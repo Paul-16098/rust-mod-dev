@@ -47,7 +47,10 @@ impl Cofg {
 
     cofg.validate();
     if !Path::new("./cofg.json").exists() {
-      cofg.new_user_select_cofg();
+      // 測試環境下不做互動式詢問，避免 CI/測試卡住
+      if !cfg!(test) {
+        cofg.new_user_select_cofg();
+      }
     }
     cofg.write_file();
     cofg
@@ -63,7 +66,11 @@ impl Cofg {
         "en".to_string()
       }
     };
-    if !log::Level::iter().any(|v| { v.as_str() == self.loglv.to_uppercase() }) {
+    // 正規化日誌等級為小寫值，並驗證有效性（debug/info/warn/trace）
+    let lv = self.loglv.to_lowercase();
+    if matches!(lv.as_str(), "debug" | "info" | "warn" | "trace") {
+      self.loglv = lv;
+    } else {
       self.loglv = "info".to_string();
     }
   }
@@ -151,7 +158,10 @@ impl Cofg {
   /// * 設置程序語言環境
   /// * 初始化日誌系統
   pub(crate) fn init(&mut self) {
-    self.load_cli(Cli::parse());
+    // 測試時跳過解析命令列參數，避免 nextest 注入的引數導致 clap 報錯
+    if !cfg!(test) {
+      self.load_cli(Cli::parse());
+    }
 
     for path in [&self.path.tmp_path, &self.path.results_path].iter() {
       let path_obj = std::path::Path::new(path);
@@ -167,6 +177,7 @@ impl Cofg {
     rust_i18n::set_locale(&self.locale);
     let mut colog_cofg = colog::default_builder();
     if !cfg!(test) {
+      // self.loglv 已在 validate() 正規化為小寫
       match self.loglv.as_str() {
         "warn" => {
           colog_cofg.filter_level(log::LevelFilter::Warn);

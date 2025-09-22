@@ -6,11 +6,6 @@ use std::path::Path;
 use crate::cofg::Cofg;
 
 #[test]
-fn on_f() {
-  unsafe { std::env::set_var("key", "value") }
-}
-
-#[test]
 fn test_process_file_path() {
   use crate::boot_json::process_file_path;
   assert_eq!(
@@ -45,6 +40,25 @@ fn test_boot_json_in_list() {
   assert!(boot_json.in_list("README.md"));
   assert!(boot_json.in_list("img/a.png"));
   assert!(!boot_json.in_list("not_exist.txt"));
+}
+
+#[test]
+fn test_boot_json_in_list_handles_none() {
+  use crate::boot_json::BootJson;
+  // 各清單為 None 時不應 panic，且只應匹配 boot.json
+  let boot_json = BootJson {
+    name: "t".to_string(),
+    version: None,
+    additionFile: None,
+    imgFileList: None,
+    scriptFileList: None,
+    styleFileList: None,
+    tweeFileList: None,
+    addonPlugin: None,
+    dependenceInfo: None,
+  };
+  assert!(boot_json.in_list("boot.json"));
+  assert!(!boot_json.in_list("a.png"));
 }
 
 #[test]
@@ -150,6 +164,27 @@ fn test_new_from_json_str_invalid_locale_and_loglv() {
   assert!(cofg.pause);
   assert!(cofg.ts_process);
   assert_eq!(cofg.file_name, "test2.mod.zip");
+  remove_test_file();
+}
+
+#[test]
+fn test_log_level_uppercase_normalization() {
+  remove_test_file();
+  let json =
+    r#"{
+            "locale": "en",
+            "loglv": "DEBUG",
+            "path": {
+                "tmp_path": "./tmp_x",
+                "results_path": "./results_x",
+                "mods_path": "./mods_x"
+            },
+            "pause": false,
+            "ts_process": false,
+            "file_name": "x.mod.zip"
+        }"#;
+  let cofg = Cofg::new_from_json_str(json);
+  assert_eq!(cofg.loglv, "debug");
   remove_test_file();
 }
 

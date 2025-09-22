@@ -141,9 +141,10 @@ impl BootJson {
 
     trace!("檢查路徑: {normalized_path}");
     lists.iter().any(|list| {
-      let r = list.as_ref().unwrap().contains(&normalized_path);
-      trace!("    {r}");
-      r
+      // 將 None 視為空清單，避免 unwrap 造成 panic
+      let contains = list.as_ref().map_or(false, |v| v.contains(&normalized_path));
+      trace!("    {}", contains);
+      contains
     })
   }
 }
