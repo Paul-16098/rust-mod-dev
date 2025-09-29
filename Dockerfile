@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # ---- Builder stage: compile the Rust CLI ----
-FROM rust:1.89-slim-bookworm AS builder
+FROM rust:1.90-slim-bookworm AS builder
 
 # Create app dir and copy manifests first to leverage Docker layer cache
 WORKDIR /app
