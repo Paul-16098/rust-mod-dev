@@ -1,40 +1,151 @@
-# Copilot instructions for rust-mod-dev
+# Copilot Instructions for rust-mod-dev
 
-Purpose: a CLI that scans per-mod folders, normalizes boot.json, optionally compiles TS, and zips each mod into results. Keep changes aligned with these patterns.
+**Purpose:** A Rust CLI that orchestrates MOD packaging: scans per-mod folders, auto-normalizes `boot.json`, optionally transpiles TypeScript, and outputs zipped MODs.
 
-## Big picture
-- Orchestration in `src/main.rs` (order matters): `copy_to_tmp` → `process_ts_files` (optional) → `process_boot_json_files` → `compress_mod_folders` → optional pause.
-- Config `Cofg` (`src/cofg.rs`) loads from `./cofg.json` (see `cofg.schema.json`), then applies CLI overrides (clap). First run (no file) prompts via dialoguer and writes defaults.
-- i18n with `rust-i18n`, keys in `locales/app.yml` via `t!(...)`. Logging via `colog` + `log`, level from config/CLI.
-- Build metadata: `build.rs` injects env `VERSION = <pkg-ver>(<profile>)-<git-commit>(actions/runs/<id>|Local)`, used by clap `--version`.
+---
 
-## Conventions & gotchas
-- Mods live under `./mods/<modName>/` and MUST have a `boot.json` at the root; a `.ig` file in a mod folder makes `copy_to_tmp` skip it.
-- Inside `boot.json`, use forward slashes (`/`) for paths. `BootJson::in_list()` normalizes but favor `/` to avoid mismatches.
-- `process_boot_json_files()` auto-fills lists by scanning the mod folder: `**/*.png`, `**/*.js`, `**/*.css`, `**/*.twee`, plus `README.*`, `License*`, `*.js.map` into `additionFile`.
-- Before zipping, `compress_mod_folders()` removes files not listed in `boot.json` (except `boot.json`) and prunes empty directories. Unlisted files won’t ship.
-- Zip name pattern from `Cofg.file_name` using `{name}` and `{ver}` (from `boot.json`, default `1.0.0`), output to `Cofg.path.results_path` (default `./results`).
-- TS pipeline: if `Cofg.ts_process` or `--tsp`, run `tsc` per temp mod folder containing `.ts` (excluding `.d.ts`). Uses `tsc.cmd` on Windows; ensure `tsc` is on PATH.
-- `Cofg.init()` clears and recreates `tmp`/`results`, and ensures `mods` exists. Do not point these paths to important dirs.
+## Architecture & Data Flow
 
-## Source map
-- `src/boot_json.rs`: data model + `new()`, `update_file_lists()`, `in_list()`, `scan_and_add_files()`, `process_file_path()`.
-- `src/cofg.rs`: CLI, config load/validate/write, i18n/log init, interactive defaults, `Default` values.
-- `src/fs_utils.rs`: `copy_dir_all()` (skips `.git`), `check_empty_dirs()`.
-- `src/main.rs`: pipeline, zipping (`zip`, `zip-extensions`), walking (`walkdir`), globbing (`glob`).
+### Pipeline (Order-Critical)
 
-## Developer workflows
-- Build: `cargo build` (or `--release`).
-- Tests: `cargo test` (VS Code task available: “cargo: nextest”). Key cases in `src/tests/mod.rs` cover path handling, list updates, and main pipeline.
-- Typical run: put mods in `./mods/`, run the binary, collect zips from `./results/`.
-- CI: `.github/workflows/cli.yml` cross-builds (Linux/musl, Windows MSVC, macOS, FreeBSD) and publishes artifacts; exports `ACTIONS_ID`. Weekly rustsec audit in `Security-audit.yml`.
+The main orchestration in `src/main.rs` executes sequentially:
 
-## Examples to follow
-- Include new file type: extend scan patterns in `update_file_lists()` and list checks in `in_list()` (both in `src/boot_json.rs`).
-- Skip a mod folder: add `.ig` inside `mods/<name>/` (honored by `copy_to_tmp`).
-- Force ship a file: add its relative path (with `/`) to `additionFile` in `boot.json`.
+1. **`copy_to_tmp`** — Copies mods from `./mods/<modName>` to temp working directory; skips folders containing `.ig` marker files.
+2. **`process_ts_files`** (conditional) — If `Cofg.ts_process` enabled, runs `tsc` on each temp folder with `.ts` files (excluding `.d.ts`).
+3. **`process_boot_json_files`** — Reads/validates `boot.json`, auto-scans and populates file lists, writes normalized JSON back.
+4. **`compress_mod_folders`** — Prunes unlisted files and empty directories, then zips mods to `./results/`.
+5. **`pause`** (optional) — Pauses execution for user inspection.
 
-## Quality bar
-- Keep `boot.json` paths relative to mod root and use `/` separators.
-- Preserve pipeline order and the prune-before-zip behavior.
-- Localize user-facing strings with `t!(...)` and define keys in `locales/app.yml`.
+### Config & Initialization (`Cofg` in `src/cofg.rs`)
+
+- **Load source:** `./cofg.json` (schema defined in `cofg.schema.json`), then CLI overrides via clap.
+- **First run:** If `cofg.json` doesn't exist, `new_user_select_cofg()` interactively prompts (locale, TS mode, pause, file naming, log level) via `dialoguer`, then writes config.
+- **Critical:** `Cofg::init()` clears and recreates `tmp/` and `results/`; never point these to important directories.
+
+### Metadata & Versioning (`build.rs`)
+
+- Injects `VERSION` env var at compile time: `<pkg-ver>(<profile>)-<git-commit>(actions/runs/<id>|Local)`
+- Git commit fetched from `.git`; in CI, `ACTIONS_ID` env var used; falls back to "Local" when not in GitHub Actions.
+- `--version` flag displays this injected version string.
+
+### Boot.json Structure (`src/boot_json.rs`)
+
+- **Core fields:** `name` (required), `version` (optional, defaults to `1.0.0`).
+- **File lists:** `imgFileList`, `scriptFileList`, `styleFileList`, `tweeFileList`, `additionFile` (e.g., README, License, `.js.map`).
+- **Relations:** `addonPlugin` (nested: `modName`, `addonName`, `modVersion`, `params`), `dependenceInfo` (nested: `modName`, `version`).
+
+---
+
+## Conventions & Critical Gotchas
+
+### Path Handling
+
+- Mods **must** live at `./mods/<modName>/` with `boot.json` at root.
+- Inside `boot.json`, **always use forward slashes** (`/`) for paths; `process_file_path()` normalizes cross-platform but favoring `/` avoids mismatches.
+- `process_file_path()` strips base path and returns relative paths in `/` format.
+
+### Auto-Scanning (`update_file_lists()`)
+
+- Scans these patterns: `**/*.png`, `**/*.js`, `**/*.css`, `**/*.twee`, plus `README.*`, `License*`, `*.js.map`.
+- Results populate the respective file lists; always validates via `in_list()` before zipping.
+
+### Pre-Zip Pruning (`compress_mod_folders()`)
+
+- **Removes** all files NOT listed in normalized `boot.json` (except `boot.json` itself).
+- **Prunes** empty directories.
+- **Unlisted files won't ship** — ensure file lists are complete.
+
+### TypeScript Pipeline
+
+- **Trigger:** `--tsp` CLI flag or `Cofg.ts_process = true`.
+- **Command:** Windows uses `tsc.cmd`; other OSes use `tsc` directly (ensure in PATH).
+- **Scope:** Runs per temp mod folder; skips `.d.ts` files.
+
+### Zip Output
+
+- **Naming:** Derived from `Cofg.file_name` template using `{name}` (from `boot.json`) and `{ver}` (version, default `1.0.0`).
+- **Location:** `Cofg.path.results_path` (default `./results`).
+
+### Skip Mechanism
+
+- Add a `.ig` file inside `mods/<modName>/` to make `copy_to_tmp` skip that folder entirely.
+
+---
+
+## Internationalization & Logging
+
+- **i18n:** All user-facing strings use `t!(key)` macro from `rust-i18n`; translations in `locales/app.yml`.
+- **Logging:** Via `colog` + `log` crate; level set by `Cofg.loglv` or CLI (`--loglv` flag). Levels: warn, info, debug, trace.
+
+---
+
+## Source Map
+
+| Module             | Responsibility                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `src/main.rs`      | Pipeline orchestration, file I/O, zipping logic (using `zip` & `zip-extensions` crates)                 |
+| `src/boot_json.rs` | `BootJson` struct, file list scanning, path normalization (`process_file_path`), validation (`in_list`) |
+| `src/cofg.rs`      | Config load/save, CLI parsing (clap), interactive setup, i18n/log initialization                        |
+| `src/fs_utils.rs`  | Filesystem utilities: `copy_dir_all()` (skips `.git`), `check_empty_dirs()`                             |
+| `build.rs`         | Version injection, Git/Actions integration                                                              |
+
+---
+
+## Developer Workflows
+
+### Building
+
+```bash
+cargo build        # Debug
+cargo build --release
+```
+
+### Testing
+
+```bash
+cargo test
+# or via VS Code task: "cargo: nextest"
+```
+
+Key test cases in `src/tests/mod.rs`: path normalization, list updates, file scanning. Tests use `tempfile` for isolated file operations.
+
+### Local Development
+
+1. Create test mods in `./mods/<modName>/` with `boot.json`.
+2. Run binary; first execution creates `./cofg.json` interactively.
+3. Outputs appear in `./results/`.
+
+### CI/CD
+
+- **`.github/workflows/cli.yml`:** Cross-builds for Linux (musl), Windows (MSVC), macOS, FreeBSD; publishes release artifacts.
+- **`.github/workflows/Security-audit.yml`:** Weekly rustsec vulnerability scan.
+- CI sets `ACTIONS_ID` env var for version tagging.
+
+---
+
+## Common Extension Points
+
+### Adding a New File Type
+
+1. Update scan pattern in `update_file_lists()` (e.g., `**/*.md`).
+2. Add new field to `BootJson` struct (e.g., `docFileList`).
+3. Update `in_list()` to check the new list.
+4. Add localization strings to `locales/app.yml`.
+
+### Customizing Zip Output
+
+- Modify `Cofg.file_name` template (e.g., `"v{ver}-{name}.zip"`).
+- Adjust compression logic in `compress_mod_folders()` if needed.
+
+### Skipping Mods Selectively
+
+- Add `.ig` marker file to mod folders to exclude from pipeline.
+
+---
+
+## Quality Standards
+
+- **Paths in boot.json:** Always relative to mod root, use `/` separators (not `\`).
+- **Pipeline order:** Critical; maintain sequence to ensure TS compilation before boot.json processing.
+- **Localization:** Every user-facing string in `t!(...)` with keys in `locales/app.yml`.
+- **File pruning:** Do not remove files users expect; verify `boot.json` lists are complete before shipping.

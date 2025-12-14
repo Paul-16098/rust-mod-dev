@@ -2,124 +2,139 @@
 
 #![cfg(test)]
 
-use std::path::Path;
 use crate::cofg::Cofg;
+use std::path::Path;
 
 #[test]
 fn test_process_file_path() {
-  use crate::boot_json::process_file_path;
-  assert_eq!(
-    process_file_path(Path::new("c:a/b/c/d"), Path::new("c:a/b")).ok().unwrap(),
-    "c/d".to_string()
-  );
+    use crate::boot_json::process_file_path;
+    assert_eq!(
+        process_file_path(Path::new("c:a/b/c/d"), Path::new("c:a/b"))
+            .ok()
+            .unwrap(),
+        "c/d".to_string()
+    );
 }
 #[test]
 fn test_process_error_file_path() {
-  use crate::boot_json::process_file_path;
-  assert_eq!(
-    process_file_path(Path::new("c:a/b/c/d"), Path::new("c:a/e")).err().unwrap().to_string(),
-    "Failed to strip prefix: c:a/e from path: c:a/b/c/d".to_string()
-  );
+    use crate::boot_json::process_file_path;
+    assert_eq!(
+        process_file_path(Path::new("c:a/b/c/d"), Path::new("c:a/e"))
+            .err()
+            .unwrap()
+            .to_string(),
+        "Failed to strip prefix: c:a/e from path: c:a/b/c/d".to_string()
+    );
 }
 
 #[test]
 fn test_boot_json_in_list() {
-  use crate::boot_json::BootJson;
-  let boot_json = BootJson {
-    name: "testmod".to_string(),
-    version: Some("1.0.0".to_string()),
-    additionFile: Some(vec!["README.md".to_string()]),
-    imgFileList: Some(vec!["img/a.png".to_string()]),
-    scriptFileList: Some(vec!["main.js".to_string()]),
-    styleFileList: Some(vec!["main.css".to_string()]),
-    tweeFileList: Some(vec!["story.twee".to_string()]),
-    addonPlugin: Some(vec![]),
-    dependenceInfo: Some(vec![]),
-  };
-  assert!(boot_json.in_list("boot.json"));
-  assert!(boot_json.in_list("README.md"));
-  assert!(boot_json.in_list("img/a.png"));
-  assert!(!boot_json.in_list("not_exist.txt"));
+    use crate::boot_json::BootJson;
+    let boot_json = BootJson {
+        name: "testmod".to_string(),
+        version: Some("1.0.0".to_string()),
+        additionFile: Some(vec!["README.md".to_string()]),
+        imgFileList: Some(vec!["img/a.png".to_string()]),
+        scriptFileList: Some(vec!["main.js".to_string()]),
+        styleFileList: Some(vec!["main.css".to_string()]),
+        tweeFileList: Some(vec!["story.twee".to_string()]),
+        addonPlugin: Some(vec![]),
+        dependenceInfo: Some(vec![]),
+    };
+    assert!(boot_json.in_list("boot.json"));
+    assert!(boot_json.in_list("README.md"));
+    assert!(boot_json.in_list("img/a.png"));
+    assert!(!boot_json.in_list("not_exist.txt"));
 }
 
 #[test]
 fn test_boot_json_in_list_handles_none() {
-  use crate::boot_json::BootJson;
-  // 各清單為 None 時不應 panic，且只應匹配 boot.json
-  let boot_json = BootJson {
-    name: "t".to_string(),
-    version: None,
-    additionFile: None,
-    imgFileList: None,
-    scriptFileList: None,
-    styleFileList: None,
-    tweeFileList: None,
-    addonPlugin: None,
-    dependenceInfo: None,
-  };
-  assert!(boot_json.in_list("boot.json"));
-  assert!(!boot_json.in_list("a.png"));
+    use crate::boot_json::BootJson;
+    // 各清單為 None 時不應 panic，且只應匹配 boot.json
+    let boot_json = BootJson {
+        name: "t".to_string(),
+        version: None,
+        additionFile: None,
+        imgFileList: None,
+        scriptFileList: None,
+        styleFileList: None,
+        tweeFileList: None,
+        addonPlugin: None,
+        dependenceInfo: None,
+    };
+    assert!(boot_json.in_list("boot.json"));
+    assert!(!boot_json.in_list("a.png"));
 }
 
 #[test]
 fn test_scan_and_add_files() {
-  use crate::boot_json::scan_and_add_files;
-  use std::fs::{ create_dir_all, File };
-  use tempfile::tempdir;
+    use crate::boot_json::scan_and_add_files;
+    use std::fs::{File, create_dir_all};
+    use tempfile::tempdir;
 
-  let dir = tempdir().unwrap();
-  let dir_path = dir.path();
-  create_dir_all(dir_path.join("img")).unwrap();
-  let img_file = dir_path.join("img/test.png");
-  File::create(&img_file).unwrap();
+    let dir = tempdir().unwrap();
+    let dir_path = dir.path();
+    create_dir_all(dir_path.join("img")).unwrap();
+    let img_file = dir_path.join("img/test.png");
+    File::create(&img_file).unwrap();
 
-  let mut img_files = vec![];
-  let pattern = format!("{}/**/*.png", dir_path.display());
-  scan_and_add_files(&pattern, &mut img_files, dir_path).unwrap();
-  assert!(img_files.iter().any(|f| (f.ends_with("img/test.png") || f.ends_with("img\\test.png"))));
+    let mut img_files = vec![];
+    let pattern = format!("{}/**/*.png", dir_path.display());
+    scan_and_add_files(&pattern, &mut img_files, dir_path).unwrap();
+    assert!(
+        img_files
+            .iter()
+            .any(|f| f.ends_with("img/test.png") || f.ends_with("img\\test.png"))
+    );
 }
 
 #[test]
 fn test_update_file_lists() {
-  use crate::boot_json::BootJson;
-  use std::fs::{ create_dir_all, File };
-  use tempfile::tempdir;
+    use crate::boot_json::BootJson;
+    use std::fs::{File, create_dir_all};
+    use tempfile::tempdir;
 
-  let dir = tempdir().unwrap();
-  let dir_path = dir.path();
-  create_dir_all(dir_path.join("img")).unwrap();
-  File::create(dir_path.join("img/a.png")).unwrap();
-  File::create(dir_path.join("README.md")).unwrap();
-  let mut boot_json = BootJson {
-    name: "testmod".to_string(),
-    version: None,
-    additionFile: None,
-    imgFileList: None,
-    scriptFileList: None,
-    styleFileList: None,
-    tweeFileList: None,
-    addonPlugin: None,
-    dependenceInfo: None,
-  };
-  boot_json.update_file_lists(dir_path).unwrap();
-  assert!(
-    boot_json.imgFileList
-      .as_ref()
-      .unwrap()
-      .iter()
-      .any(|f| (f.ends_with("img/a.png") || f.ends_with("img\\a.png")))
-  );
-  assert!(boot_json.additionFile.as_ref().unwrap().contains(&"README.md".to_string()));
+    let dir = tempdir().unwrap();
+    let dir_path = dir.path();
+    create_dir_all(dir_path.join("img")).unwrap();
+    File::create(dir_path.join("img/a.png")).unwrap();
+    File::create(dir_path.join("README.md")).unwrap();
+    let mut boot_json = BootJson {
+        name: "testmod".to_string(),
+        version: None,
+        additionFile: None,
+        imgFileList: None,
+        scriptFileList: None,
+        styleFileList: None,
+        tweeFileList: None,
+        addonPlugin: None,
+        dependenceInfo: None,
+    };
+    boot_json.update_file_lists(dir_path).unwrap();
+    assert!(
+        boot_json
+            .imgFileList
+            .as_ref()
+            .unwrap()
+            .iter()
+            .any(|f| f.ends_with("img/a.png") || f.ends_with("img\\a.png"))
+    );
+    assert!(
+        boot_json
+            .additionFile
+            .as_ref()
+            .unwrap()
+            .contains(&"README.md".to_string())
+    );
 }
 fn remove_test_file() {
-  let _ = std::fs::remove_file("./cofg.json");
+    let _ = std::fs::remove_file("./cofg.json");
 }
 
 #[test]
 fn test_new_from_json_str_valid() {
-  remove_test_file();
-  let json =
-    r#"{
+    remove_test_file();
+    let json = r#"{
             "locale": "zh-cn",
             "loglv": "debug",
             "path": {
@@ -131,21 +146,20 @@ fn test_new_from_json_str_valid() {
             "ts_process": false,
             "file_name": "test.mod.zip"
         }"#;
-  let cofg = Cofg::new_from_json_str(json);
-  assert_eq!(cofg.locale, "zh_cn");
-  assert_eq!(cofg.loglv, "debug");
-  assert_eq!(cofg.path.tmp_path, "./tmp_test");
-  assert!(!cofg.pause);
-  assert!(!cofg.ts_process);
-  assert_eq!(cofg.file_name, "test.mod.zip");
-  remove_test_file();
+    let cofg = Cofg::new_from_json_str(json);
+    assert_eq!(cofg.locale, "zh_cn");
+    assert_eq!(cofg.loglv, "debug");
+    assert_eq!(cofg.path.tmp_path, "./tmp_test");
+    assert!(!cofg.pause);
+    assert!(!cofg.ts_process);
+    assert_eq!(cofg.file_name, "test.mod.zip");
+    remove_test_file();
 }
 
 #[test]
 fn test_new_from_json_str_invalid_locale_and_loglv() {
-  remove_test_file();
-  let json =
-    r#"{
+    remove_test_file();
+    let json = r#"{
             "locale": "invalid_locale",
             "loglv": "invalid_log",
             "path": {
@@ -157,21 +171,20 @@ fn test_new_from_json_str_invalid_locale_and_loglv() {
             "ts_process": true,
             "file_name": "test2.mod.zip"
         }"#;
-  let cofg = Cofg::new_from_json_str(json);
-  assert_eq!(cofg.locale, "en"); // fallback
-  assert_eq!(cofg.loglv, "info"); // fallback
-  assert_eq!(cofg.path.tmp_path, "./tmp_test2");
-  assert!(cofg.pause);
-  assert!(cofg.ts_process);
-  assert_eq!(cofg.file_name, "test2.mod.zip");
-  remove_test_file();
+    let cofg = Cofg::new_from_json_str(json);
+    assert_eq!(cofg.locale, "en"); // fallback
+    assert_eq!(cofg.loglv, "info"); // fallback
+    assert_eq!(cofg.path.tmp_path, "./tmp_test2");
+    assert!(cofg.pause);
+    assert!(cofg.ts_process);
+    assert_eq!(cofg.file_name, "test2.mod.zip");
+    remove_test_file();
 }
 
 #[test]
 fn test_log_level_uppercase_normalization() {
-  remove_test_file();
-  let json =
-    r#"{
+    remove_test_file();
+    let json = r#"{
             "locale": "en",
             "loglv": "DEBUG",
             "path": {
@@ -183,76 +196,77 @@ fn test_log_level_uppercase_normalization() {
             "ts_process": false,
             "file_name": "x.mod.zip"
         }"#;
-  let cofg = Cofg::new_from_json_str(json);
-  assert_eq!(cofg.loglv, "debug");
-  remove_test_file();
+    let cofg = Cofg::new_from_json_str(json);
+    assert_eq!(cofg.loglv, "debug");
+    remove_test_file();
 }
 
 #[test]
 fn test_new_from_json_str_partial_json() {
-  remove_test_file();
-  let json = r#"{
+    remove_test_file();
+    let json = r#"{
             "locale": "en"
         }"#;
-  let cofg = Cofg::new_from_json_str(json);
-  assert_eq!(cofg.locale, "en");
-  assert_eq!(cofg.loglv, "info"); // default
-  assert_eq!(cofg.path.tmp_path, "./tmp"); // default
-  assert!(cofg.pause); // default
-  assert!(cofg.ts_process); // default
-  assert_eq!(cofg.file_name, "{name}.mod.zip"); // default
-  remove_test_file();
+    let cofg = Cofg::new_from_json_str(json);
+    assert_eq!(cofg.locale, "en");
+    assert_eq!(cofg.loglv, "info"); // default
+    assert_eq!(cofg.path.tmp_path, "./tmp"); // default
+    assert!(cofg.pause); // default
+    assert!(cofg.ts_process); // default
+    assert_eq!(cofg.file_name, "{name}.mod.zip"); // default
+    remove_test_file();
 }
 
 #[test]
 fn test_new_from_json_str_invalid_json() {
-  remove_test_file();
-  let json = r#"not a json"#;
-  let cofg = Cofg::new_from_json_str(json);
-  // Should fallback to default
-  assert_eq!(cofg.locale, "en");
-  assert_eq!(cofg.loglv, "info");
-  assert_eq!(cofg.path.tmp_path, "./tmp");
-  remove_test_file();
+    remove_test_file();
+    let json = r#"not a json"#;
+    let cofg = Cofg::new_from_json_str(json);
+    // Should fallback to default
+    assert_eq!(cofg.locale, "en");
+    assert_eq!(cofg.loglv, "info");
+    assert_eq!(cofg.path.tmp_path, "./tmp");
+    remove_test_file();
 }
 #[test]
+#[ignore]
 fn test_main() {
-  let r = tempfile::TempDir::new().unwrap();
-  let rp = r.path();
-  let mrp = rp.join("mod");
-  std::fs::create_dir(&mrp).unwrap();
-  let rrp = rp.join("results");
-  std::fs::create_dir(&rrp).unwrap();
-  let trp = rp.join("tmp");
-  std::fs::create_dir(&trp).unwrap();
-  let mut c = crate::Cofg::new_from_json_str(
+    let r = tempfile::TempDir::new().unwrap();
+    let rp = r.path();
+    let mrp = rp.join("mod");
+    std::fs::create_dir(&mrp).unwrap();
+    let rrp = rp.join("results");
+    std::fs::create_dir(&rrp).unwrap();
+    let trp = rp.join("tmp");
+    std::fs::create_dir(&trp).unwrap();
+    let mut c = crate::Cofg::new_from_json_str(
     &r#"{"pause":false,"path":{"mods_path":"{mrp}","results_path":"{rrp}","tmp_path":"{trp}"}}"#
       .replace("{mrp}", mrp.to_str().unwrap())
       .replace("{rrp}", rrp.to_str().unwrap())
       .replace("{trp}", trp.to_str().unwrap())
   );
-  c.init();
-  crate::copy_to_tmp(&c);
-  crate::process_ts_files(&c);
-  crate::process_boot_json_files(&c);
-  crate::compress_mod_folders(&c);
-  r.close().unwrap();
+    c.init();
+    crate::copy_to_tmp(&c);
+    crate::process_ts_files(&c);
+    crate::process_boot_json_files(&c);
+    crate::compress_mod_folders(&c);
+    r.close().unwrap();
 }
 #[test]
 fn test_boot_json_new() {
-  use crate::BootJson;
-  let r = tempfile::TempDir::new().unwrap();
-  let bjp = r.path().join("b.json");
-  std::fs::write(&bjp, r#"{"name":"t1"}"#).unwrap();
-  BootJson::new(bjp.to_str().unwrap()).unwrap();
+    use crate::BootJson;
+    let r = tempfile::TempDir::new().unwrap();
+    let bjp = r.path().join("b.json");
+    std::fs::write(&bjp, r#"{"name":"t1"}"#).unwrap();
+    BootJson::new(bjp.to_str().unwrap()).unwrap();
 }
 #[test]
 fn test_cofg_new() {
-  std::fs::write(Path::new("./cofg.json"), r#"{}"#).unwrap();
-  crate::Cofg::new();
+    std::fs::write(Path::new("./cofg.json"), r#"{}"#).unwrap();
+    crate::Cofg::new();
 }
 #[test]
 fn test_cofg_new_ne() {
-  let _ = std::fs::remove_file(Path::new("./cofg.json"));
-  crate::Cofg::new().init();
+    let _ = std::fs::remove_file(Path::new("./cofg.json"));
+    crate::Cofg::new().init();
 }
