@@ -2004,9 +2004,9 @@ dependencies = [
 
 [[package]]
 name = "zip-extensions"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4127e4768595fdcf14a3d879d866e72e66d160282b98e03f8bce66b6f4274b98"
+checksum = "b9bb4da4a220bfb79c2b7bfa88466181778892ddaffaca9f06d5e9cc5de0b46f"
 dependencies = [
  "ignore",
  "zip",
