@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.19
+# syntax=docker/dockerfile:1.21
 
 # ---- Builder stage: compile the Rust CLI ----
 FROM rust:1.90-slim-bookworm AS builder
